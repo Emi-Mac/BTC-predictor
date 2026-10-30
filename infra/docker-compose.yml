@@ -64,6 +64,7 @@ services:
       BACKEND_PORT: ${BACKEND_PORT:-8000}
       BACKEND_RELOAD: ${BACKEND_RELOAD:-true}
       BACKEND_AUTO_CREATE_SCHEMA: ${BACKEND_AUTO_CREATE_SCHEMA:-false}
+      BACKEND_RATE_LIMIT: ${BACKEND_RATE_LIMIT:-120/minute}
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       MODEL_ARTIFACT_DIR: /app/artifacts

@@ -257,7 +257,7 @@ btc-predictor/
 | 1 — Ingesta | Conectores Binance, yfinance, FGI | ✅ Completada |
 | 2 — Features | Indicadores técnicos y macroeconómicos | ✅ Completada |
 | 3 — Modelado | Walk-Forward, XGBoost, LSTM, ONNX | 🟡 Implementada; rendimiento pendiente |
-| 4 — API | FastAPI hexagonal + endpoints REST | 🔲 Pendiente |
+| 4 — API | FastAPI hexagonal + endpoints REST | ✅ Completada (80 tests, 88,5% coverage); benchmark de latencia de inferencia pendiente |
 | 5 — Frontend | Dashboard dark-mode + TradingView | 🔲 Pendiente |
 | 6 — Integración | E2E tests, hardening, model drift | 🔲 Pendiente |
 

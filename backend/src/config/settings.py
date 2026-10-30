@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     backend_reload: bool = False
     backend_auto_create_schema: bool = True
+    backend_rate_limit: str = "120/minute"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
 
     # ── ML ───────────────────────────────────────────────────

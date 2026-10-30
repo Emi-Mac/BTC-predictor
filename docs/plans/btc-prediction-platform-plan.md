@@ -633,6 +633,6 @@ flowchart LR
 - [ ] **Fase 1:** ≥3 años de velas 4h en DB. Cron de actualización funcional. 0 duplicados, 0 gaps >1 período.
 - [ ] **Fase 2:** Tabla `computed_features` poblada. 0 NaN en features finales. Test anti-lookahead pasa.
 - [ ] **Fase 3:** Modelo exportado en ONNX. Accuracy en walk-forward > baseline + 3%. Calibración documentada. El segundo experimento alcanzó 55,36 % en un holdout de octubre, pero su margen medio de desarrollo fue +0,99 puntos frente al baseline, inferior a los +3 requeridos. Una ablación exploratoria con funding subió la media de desarrollo a 53,37 %, aún sin prueba independiente ni margen suficiente; el modelo permanece inactivo.
-- [ ] **Fase 4:** Todos los endpoints responden. Tests con >80% coverage. Inferencia <50ms p99.
+- [ ] **Fase 4:** Todos los endpoints responden. Tests con >80% coverage. Inferencia <50ms p99. Suite de tests: 80 passed, 7 skipped (requieren `TEST_DATABASE_URL`), 88,50 % de cobertura — cumple el criterio de coverage. La latencia de inferencia <50ms p99 no está verificada: los tests de `OnnxModelAdapter` usan una sesión ONNX simulada (sin modelo real) y no hay un benchmark de latencia contra un artefacto `.onnx` real.
 - [ ] **Fase 5:** Dashboard renderiza gráfico con markers. WebSocket reconecta. Responsive en mobile.
 - [ ] **Fase 6:** `docker compose up` levanta el stack completo. E2E test pasa. Disclaimer visible.
