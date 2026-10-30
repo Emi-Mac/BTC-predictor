@@ -1,0 +1,82 @@
+# ============================================================
+# BTC Predictor — .gitignore
+# ============================================================
+
+# Entorno y secretos
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# Poetry / uv
+poetry.lock        # Incluir en VCS es recomendable, pero depende del equipo
+.uv/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb~
+
+# ML Artifacts (grandes, usar DVC o almacenamiento externo)
+ml/artifacts/
+ml/data/raw/
+ml/data/processed/
+*.onnx
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+frontend/.env
+frontend/.env.local
+
+# Docker
+.dockerenv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Alembic
+# No ignorar migrations/versions/*.py — son parte del código fuente
+

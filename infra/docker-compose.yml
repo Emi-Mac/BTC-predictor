@@ -1,0 +1,135 @@
+services:
+  # ─────────────────────────────────────────────
+  # PostgreSQL 16
+  # ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: btc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-btcuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-btcpredictor}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btcuser} -d ${POSTGRES_DB:-btcpredictor}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - btc_network
+
+  # ─────────────────────────────────────────────
+  # PgAdmin (solo desarrollo)
+  # ─────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: btc_pgadmin
+    restart: unless-stopped
+    profiles:
+      - dev           # Solo se levanta con: docker compose --profile dev up
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@btcpredictor.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin_dev_only}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - btc_network
+
+  # ─────────────────────────────────────────────
+  # Backend FastAPI
+  # ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: btc_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-btcuser}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/${POSTGRES_DB:-btcpredictor}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      BACKEND_RELOAD: ${BACKEND_RELOAD:-true}
+      BACKEND_AUTO_CREATE_SCHEMA: ${BACKEND_AUTO_CREATE_SCHEMA:-false}
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      MODEL_ARTIFACT_DIR: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./backend/src:/app/src
+      - ./ml/artifacts:/app/artifacts:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - btc_network
+
+  # ─────────────────────────────────────────────
+  # ML Worker (ingesta + features + entrenamiento)
+  # ─────────────────────────────────────────────
+  ml-worker:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    container_name: btc_ml_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-btcuser}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/${POSTGRES_DB:-btcpredictor}
+      BINANCE_BASE_URL: ${BINANCE_BASE_URL:-https://api.binance.com}
+      BINANCE_FUTURES_BASE_URL: ${BINANCE_FUTURES_BASE_URL:-https://fapi.binance.com}
+      FUNDING_ENABLED: ${FUNDING_ENABLED:-true}
+      FUNDING_RATE_LIMIT_PER_MIN: ${FUNDING_RATE_LIMIT_PER_MIN:-90}
+      FUNDING_MAX_LAG_HOURS: ${FUNDING_MAX_LAG_HOURS:-24}
+      FUNDING_FEATURE_MAX_AGE_HOURS: ${FUNDING_FEATURE_MAX_AGE_HOURS:-36}
+      BTC_SYMBOL: ${BTC_SYMBOL:-BTCUSDT}
+      DEFAULT_INTERVAL: ${DEFAULT_INTERVAL:-4h}
+      MACRO_SYMBOLS: ${MACRO_SYMBOLS:-DX-Y.NYB,^GSPC,^VIX,GC=F}
+      FEAR_GREED_BASE_URL: ${FEAR_GREED_BASE_URL:-https://api.alternative.me/fng/}
+      MODEL_ARTIFACT_DIR: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INGESTION_WATCHDOG_SECONDS: ${INGESTION_WATCHDOG_SECONDS:-60}
+    volumes:
+      - ./ml/src:/app/src
+      - ./ml/artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "src.ingestion.run", "check"]
+      interval: 1m
+      timeout: 30s
+      retries: 3
+      start_period: 2m
+    networks:
+      - btc_network
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  btc_network:
+    driver: bridge

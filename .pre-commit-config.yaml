@@ -1,0 +1,68 @@
+repos:
+  # ── Python: Ruff (lint + format) ──────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(ml|backend)/
+      - id: ruff-format
+        files: ^(ml|backend)/
+
+  # ── Python: Mypy (type checking) ──────────────────────────
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        files: ^(ml|backend)/src/
+        additional_dependencies:
+          - pydantic>=2.7.0
+          - sqlalchemy[mypy]>=2.0.30
+
+  # ── General: trailing whitespace, EOF, etc. ────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]          # Evita subir modelos ML por accidente
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, production]
+
+  # ── Secrets detection ─────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: .env.example
+
+  # ── Frontend: ESLint + Prettier ───────────────────────────
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint (frontend)
+        language: node
+        entry: bash -c 'cd frontend && npx eslint --fix src/'
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: prettier
+        name: Prettier (frontend)
+        language: node
+        entry: bash -c 'cd frontend && npx prettier --write src/'
+        files: ^frontend/src/.*\.(ts|tsx|css|json)$
+        pass_filenames: false
+
+  # ── Docker Compose validation ──────────────────────────────
+  - repo: https://github.com/IamTheFij/docker-pre-commit
+    rev: v3.0.1
+    hooks:
+      - id: docker-compose-check
+        files: docker-compose.*\.yml$
+
