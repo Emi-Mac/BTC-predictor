@@ -94,7 +94,7 @@ services:
       dockerfile: Dockerfile
     container_name: btc_ml_worker
     restart: unless-stopped
-    environment:
+    environment: &ml_environment
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-btcuser}:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/${POSTGRES_DB:-btcpredictor}
       BINANCE_BASE_URL: ${BINANCE_BASE_URL:-https://api.binance.com}
       BINANCE_FUTURES_BASE_URL: ${BINANCE_FUTURES_BASE_URL:-https://fapi.binance.com}
@@ -121,6 +121,18 @@ services:
       timeout: 30s
       retries: 3
       start_period: 2m
+    networks:
+      - btc_network
+
+  # Investigación offline con el código incluido en una imagen inmutable.
+  ml-research:
+    image: ${ML_RESEARCH_IMAGE:-btc-predictor-ml-worker:latest}
+    profiles:
+      - research
+    environment: *ml_environment
+    volumes:
+      - ./ml/artifacts:/app/artifacts
+    command: ["python", "-c", "raise SystemExit('Use docker compose run ml-research python -m ...')"]
     networks:
       - btc_network
 
