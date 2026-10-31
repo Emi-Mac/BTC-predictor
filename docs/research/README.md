@@ -18,11 +18,17 @@ qué resultó y qué no conviene repetir. Los artefactos (`ml/artifacts/`) **no 
    registro), actualizar el estado en [model-improvement-plan.md](../plans/model-improvement-plan.md)
    y conservar el `report.json` del artefacto.
 
+## Estado en una línea (2026-10-31)
+
+La **dirección** de BTC no es predecible con fuentes gratuitas (E-01 a E-11; modelo
+inactivo y marcado como experimental en el producto). La **volatilidad sí** lo es (E-12,
+HAR-X con DVOL), aunque usarla para dimensionar la exposición no mejoró el Sharpe.
+
 ## Documentos
 
 | Documento | Contenido |
 |---|---|
-| [experiment-log.md](./experiment-log.md) | Registro cronológico de los experimentos E-01…E-09 con hipótesis, método, resultados, artefactos y conclusiones |
+| [experiment-log.md](./experiment-log.md) | Registro cronológico de los experimentos E-01…E-12 con hipótesis, método, resultados, artefactos y conclusiones |
 | [methodology.md](./methodology.md) | Protocolo de evaluación: particiones, purga, baselines, inferencia, gates e integridad de holdouts |
 | [data-sources.md](./data-sources.md) | Fuentes, rangos, supuestos de disponibilidad y limitaciones conocidas |
 | [feature-catalog.md](./feature-catalog.md) | Todas las features con fórmula, disponibilidad y resultado observado |

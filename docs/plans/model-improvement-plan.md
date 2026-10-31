@@ -177,7 +177,23 @@ probabilidad previa: combinar modelos sin señal no la crea.
    transparente que no supera a los baselines.
 
 Las direcciones abiertas están en el
-[registro de experimentos](../research/experiment-log.md#direcciones-abiertas-no-probadas).
+[registro de experimentos](../research/experiment-log.md#direcciones-abiertas).
+
+## 4.4 Seguimiento (2026-10-31): cierre de la línea direccional y volatilidad
+
+| Paso | Resultado | Evidencia |
+|---|---|---|
+| Opciones de Deribit (DVOL) como familia direccional | No aporta (24h −0.5 pp, 3d +0.7 pp, sin significancia; PBO 0.78). **Línea direccional cerrada** | [E-10](../research/experiment-log.md#e-10-volatilidad-implícita-de-opciones-dvol-de-deribit) |
+| Reglas clásicas de tendencia | TSMOM 180d largo/plano: Sharpe 0.94, drawdown −33%; igual que el mejor ML y sin superar a *buy & hold* (0.98) | [E-11](../research/experiment-log.md#e-11-reglas-clásicas-de-tendencia-referencia-sin-ml) |
+| Pronóstico de volatilidad | **Predecible**: HAR-X (con DVOL) mejora a HAR y al ingenuo con IC > 0 (QLIKE 7d 0.237 vs 0.262 vs 0.419) | [E-12](../research/experiment-log.md#e-12-pronóstico-de-volatilidad-y-exposición-ajustada-por-riesgo) |
+| Exposición ajustada por volatilidad | No mejora el Sharpe frente a *buy & hold* ni frente a una exposición constante equivalente | E-12 |
+| Producto | Predicción direccional marcada como **experimental** en el frontend (`frontend/src/lib/modelStatus.ts`, `page.tsx`) y en el contrato de tipos (`status`, `beats_baseline`, `baseline_overall`); especificación de las Fases 4 y 5 corregida en [btc-prediction-platform-plan.md](./btc-prediction-platform-plan.md) | — |
+
+**Recomendación vigente:**
+1. Mantener la dirección como indicador experimental y transparente.
+2. Construir como siguiente funcionalidad un **panel de riesgo**: volatilidad pronosticada a
+   7 días con HAR-X y rango esperado de precio. Antes, validar la cobertura de sus intervalos.
+3. Evaluar el holdout de noviembre a partir del 2026-12-02.
 
 ## 5. Expectativas realistas
 
