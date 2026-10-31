@@ -390,16 +390,15 @@ El informe queda en `ml/artifacts/target-study-*/report.json`. Resultados en
 
 Primero se captura un snapshot inmutable de fuentes auxiliares: velas de Binance (spot desde
 2019, perpetuo, índice de prima y ETHBTC, validadas con su `.CHECKSUM`), métricas diarias de
-CoinMetrics Community, el calendario programado del FOMC y el DVOL horario de Deribit.
-Requiere red y no modifica el dataset congelado. El snapshot `v1` (sin DVOL) corresponde a
-E-09 y se reproduce con el commit `22b3a31`; el código actual usa `v2`:
+CoinMetrics Community y el calendario programado del FOMC. Requiere red y no modifica el
+dataset congelado:
 
 ```bash
-AUX=/app/artifacts/aux-sources/aux-20190901-20261001-v2
+AUX=/app/artifacts/aux-sources/aux-20190901-20261001-v1
 docker run --rm -v "$PWD/ml/src":/app/src:ro -v "$PWD/ml/artifacts":/app/artifacts -w /app \
   -e PYTHONPATH=/app -e DATABASE_URL=postgresql://x:x@x/x btc-predictor-ml-worker:latest \
   python -m src.research.aux_sources capture --directory "$AUX" \
-  --aux-id aux-20190901-20261001-v2 --start 2019-09-01 --end 2026-10-01
+  --aux-id aux-20190901-20261001-v1 --start 2019-09-01 --end 2026-10-01
 # Verificación de huellas en cualquier momento:
 #   ... python -m src.research.aux_sources verify --directory "$AUX"
 ```
@@ -414,26 +413,7 @@ docker run --rm -v "$PWD/ml/src":/app/src:ro -v "$PWD/ml/artifacts":/app/artifac
   -e PYTHONPATH=/app -e MODEL_ARTIFACT_DIR=/app/artifacts -e DATABASE_URL=postgresql://x:x@x/x \
   btc-predictor-ml-worker:latest python -m src.research.feature_study \
   --dataset /app/artifacts/datasets/btcusdt-20200901-20261001-v1 \
-  --aux /app/artifacts/aux-sources/aux-20190901-20261001-v2 \
-  --development-end 2026-10-01T00:00:00Z
-```
-
-#### Referencias sin ML y pronóstico de volatilidad (E-11, E-12)
-
-[trend_study](./ml/src/research/trend_study.py) evalúa 20 reglas clásicas de tendencia
-(momentum y cruce de medias) con la misma contabilidad.
-[volatility_study](./ml/src/research/volatility_study.py) compara pronósticos de volatilidad
-(ingenuo, EWMA, HAR, HAR-X con DVOL y LightGBM) con pérdida QLIKE, y su uso para dimensionar
-la exposición. Ambos usan el dataset y el snapshot `v2`:
-
-```bash
-RUN="docker run --rm -v $PWD/ml/src:/app/src:ro -v $PWD/ml/artifacts:/app/artifacts -w /app \
-  -e PYTHONPATH=/app -e MODEL_ARTIFACT_DIR=/app/artifacts -e DATABASE_URL=postgresql://x:x@x/x \
-  btc-predictor-ml-worker:latest python -m"
-DATASET=/app/artifacts/datasets/btcusdt-20200901-20261001-v1
-AUX=/app/artifacts/aux-sources/aux-20190901-20261001-v2
-$RUN src.research.trend_study --dataset "$DATASET" --aux "$AUX"
-$RUN src.research.volatility_study --dataset "$DATASET" --aux "$AUX" \
+  --aux /app/artifacts/aux-sources/aux-20190901-20261001-v1 \
   --development-end 2026-10-01T00:00:00Z
 ```
 

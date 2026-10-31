@@ -62,13 +62,10 @@ export interface Prediction {
   is_correct: boolean | null;
   predicted_at: string;
   resolved_at: string | null;
-  status: ModelStatus;
 }
 
 export interface AccuracyMetrics {
   overall: number;
-  /** Accuracy del mejor baseline en el mismo período; mostrar siempre junto a `overall`. */
-  baseline_overall: number;
   last_7d: number;
   last_30d: number;
   last_90d: number;
@@ -76,22 +73,12 @@ export interface AccuracyMetrics {
   correct_predictions: number;
 }
 
-/**
- * "experimental": no supera a los baselines con significancia (gate de docs/research).
- * "validated": superó el gate de desarrollo y un holdout independiente.
- */
-export type ModelStatus = "experimental" | "validated";
-
 export interface ModelMetadata {
   version: number;
   model_type: string;
   val_accuracy: number;
   val_f1: number;
   baseline_accuracy: number;
-  best_baseline_accuracy: number;
-  beats_baseline: boolean;
-  status: ModelStatus;
-  evidence_url: string | null;
   trained_at: string;
   is_active: boolean;
 }

@@ -6,14 +6,9 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
 `ablation.json` o `walk_forward.json`. El recuento de ensayos desde la Fase 0 está en
 `ml/artifacts/experiments.jsonl`.
 
-**Estado global (2026-10-31):**
-- **Dirección:** ningún modelo supera el gate; el modelo registrado permanece **inactivo**.
-  La única regularidad robusta es una leve reversión de una vela a 4h (≈54% de acierto), que
-  una regla condicional trivial iguala y que los costos anulan. La línea direccional queda
-  **cerrada** con las fuentes gratuitas (E-01 a E-11).
-- **Volatilidad:** **sí es predecible** (E-12). HAR-X con DVOL mejora a HAR y al pronóstico
-  ingenuo con significancia. No mejora el Sharpe al usarse para dimensionar la exposición,
-  pero es un insumo válido para mostrar riesgo.
+**Estado global (2026-10-30):** ningún modelo supera el gate; el modelo registrado permanece
+**inactivo**. La única regularidad robusta es una leve reversión de una vela a 4h (≈54% de
+acierto), que una regla condicional trivial iguala y que los costos anulan.
 
 | ID | Fecha | Pregunta | Resultado | Gate |
 |---|---|---|---|---|
@@ -26,9 +21,6 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
 | E-07 | 2026-10-30 | Línea base de evaluación rigurosa (Fase 0) | 54.0% = regla condicional; Sharpe neto −2.3 | ✗ |
 | E-08 | 2026-10-30 | ¿Horizonte más largo, zona muerta o abstención? (Fase 1) | 12h–3d: 49–52% < "siempre sube" | ✗ |
 | E-09 | 2026-10-30 | ¿Features de horizonte largo? (Fase 2) | Mejor: 52.9% a 3d (+0.17 pp vs mayoría); ninguna familia conservada | ✗ |
-| E-10 | 2026-10-31 | ¿Aporta la volatilidad implícita de opciones (DVOL)? | Ninguna mejora; PBO 0.78 | ✗ |
-| E-11 | 2026-10-31 | ¿Una regla clásica de tendencia iguala al ML? | TSMOM 180d largo/plano: Sharpe 0.94, DD −33%, igual que el mejor ML; no supera a *buy & hold* | ✗ (referencia) |
-| E-12 | 2026-10-31 | ¿Es predecible la volatilidad? ¿Sirve para dimensionar la exposición? | Sí es predecible (QLIKE con IC > 0); el *vol targeting* no mejora el Sharpe | ✓ pronóstico / ✗ economía |
 
 ---
 
@@ -217,120 +209,18 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
 
 ---
 
-## E-10 Volatilidad implícita de opciones (DVOL de Deribit)
+## Direcciones abiertas (no probadas)
 
-- **Artefactos:** snapshot `ml/artifacts/aux-sources/aux-20190901-20261001-v2/` (v1 más el
-  DVOL horario) e informe `ml/artifacts/feature-study-20261031T004437Z-937bbb9c/` (se repitió
-  con el código final y dio resultados idénticos a `...003830Z-a369db2f`). Comando:
-  `python -m src.research.feature_study --aux .../aux-20190901-20261001-v2`.
-- **Hipótesis:** el mercado de opciones (volatilidad implícita, prima de varianza) contiene
-  información direccional que no está en precio, derivados ni on-chain.
-- **Método:** familia `options` (DVOL, cambios de 1/7 días, z-score de 90 días, prima de
-  varianza de 30 días, ratio implícita/realizada de 7 días) añadida como séptima extensión al
-  estudio de E-09; mismos folds, gate y regla de ablación. El skew y el put/call **no** tienen
-  historia gratuita.
-- **Resultados:**
-  - `stationary_options` frente a `stationary`: 24h −0.51 pp (IC [−1.9, +0.6]); 3d +0.67 pp
-    (IC [−1.3, +2.9]); el log-loss empeora en ambos horizontes. No se conserva.
-  - `all` con opciones: 24h 50.9% (L2), 3d 52.5% (LightGBM; peor caso −0.24 pp).
-  - Gate: límite simultáneo −5.0 pp; **PBO maximin 0.78**; White económico p = 0.98.
-  - Nota: `all` cambia respecto de E-09 porque ahora incluye la familia de opciones.
-- **Conclusión:** tampoco hay información direccional en la volatilidad implícita. Con esto
-  se cierra la línea direccional.
-- **Reabrir solo si:** hay skew o put/call históricos (de pago, p. ej. Tardis), flujo de
-  órdenes de alta frecuencia o un cambio estructural del mercado.
-
-## E-11 Reglas clásicas de tendencia (referencia sin ML)
-
-- **Artefacto:** `ml/artifacts/trend-study-20261031T004114Z-f5cc35c7/`. Comando:
-  `python -m src.research.trend_study`. Código:
-  [trend_study.py](../../ml/src/research/trend_study.py).
-- **Hipótesis:** el momentum de series de tiempo, documentado en cripto, ofrece una referencia
-  económica tan buena o mejor que los modelos de ML, sin riesgo de sobreajuste.
-- **Método:** 5 reglas preespecificadas (TSMOM de 7/30/90/180 días y cruce de medias de
-  50/200 días) × largo/plano o largo/corto × con o sin escalado a 50% de volatilidad = 20
-  estrategias. Perpetuo con 7 pb y funding. Ventanas: 48 meses OOS (primaria) y la ventana
-  evaluable de E-08/E-09.
-- **Resultados (48 meses; *buy & hold* spot: Sharpe 0.98, drawdown −53%):**
-
-  | Estrategia | Sharpe | Drawdown | Exposición | IC de ΔSharpe vs B&H |
-  |---|---|---|---|---|
-  | TSMOM 180d largo/plano | 0.94 | −33% | 64% | [−0.66, +0.57] |
-  | TSMOM 30d largo/plano | 0.85 | −40% | 56% | [−0.91, +0.56] |
-  | TSMOM 90d largo/plano | 0.77 | −34% | 56% | [−0.76, +0.52] |
-  | TSMOM 180d largo/corto | 0.71 | −40% | 100% | [−1.39, +0.94] |
-  | Cruce 50/200 largo/plano | 0.49 | −41% | 58% | [−1.19, +0.27] |
-
-  - White contra *buy & hold*: p = 0.96; PBO Sharpe 0.54. El escalado por volatilidad no
-    cambia nada (la exposición casi nunca se reduce). Las versiones largo/corto pierden frente
-    a las largo/plano.
-- **Conclusión:** una regla de una línea (largo si el retorno de 180 días es positivo)
-  reproduce el perfil de la mejor estrategia de ML de E-09 (Sharpe 0.94, drawdown −32%). Los
-  modelos no aportan valor sobre ella. Ninguna regla supera a *buy & hold* en Sharpe; solo
-  reducen el drawdown a costa del retorno.
-
-## E-12 Pronóstico de volatilidad y exposición ajustada por riesgo
-
-- **Artefacto:** `ml/artifacts/volatility-study-20261031T004234Z-fdba3c4a/` (idéntico a la
-  corrida `...003616Z-20027603`). Comando: `python -m src.research.volatility_study`. Código:
-  [volatility_study.py](../../ml/src/research/volatility_study.py).
-- **Hipótesis:** aunque la dirección no sea predecible, la volatilidad sí lo es (agrupamiento
-  de volatilidad), y un mejor pronóstico permite dimensionar la exposición.
-- **Método:**
-  - Objetivo: varianza realizada anualizada de las próximas 6 velas (1 día) y 42 velas (7
-    días, primario) con retornos de 4h.
-  - Modelos: ingenuo (varianza de la ventana previa), EWMA (vida media de 42 velas), HAR
-    (log-varianzas de 1/7/30 días), **HAR-X** (primario: HAR + DVOL, VIX, funding de 7 días,
-    OI de 7 días, drawdown de 90 días, |retorno de 1 día|, volumen relativo y FOMC ±72h) y
-    LightGBM con todas las features.
-  - Pérdida QLIKE con corrección de sesgo lognormal; los mismos 48 folds con purga por
-    horizonte; bootstrap por bloques de 180 velas.
-  - Economía: posición larga spot `min(1, 0.5/σ̂)` con banda de rebalanceo de 0.1 y 7 pb,
-    comparada con *buy & hold* y con una exposición constante igual a su media.
-- **Resultados del pronóstico (QLIKE, menor es mejor):**
-
-  | Modelo | 1 día | 7 días | R² log frente al ingenuo (7d) |
-  |---|---|---|---|
-  | Ingenuo | 2.051 | 0.419 | 0 |
-  | EWMA | 0.716 | 0.309 | +0.145 |
-  | HAR | 0.682 | 0.262 | +0.022 |
-  | **HAR-X** | 0.667 | **0.237** | **+0.185** |
-  | LightGBM | **0.577** | 0.257 | +0.025 |
-
-  - HAR frente al ingenuo (7d): mejora 0.157, IC [0.063, 0.266]. **Volatilidad predecible.**
-  - HAR-X frente a HAR (7d): mejora 0.025, IC [0.011, 0.037]. **Las variables exógenas
-    aportan.**
-  - A 1 día gana LightGBM (frente a HAR-X: IC [0.047, 0.124]); a 7 días LightGBM no supera a
-    HAR-X (IC [−0.051, +0.002]).
-  - Mincer-Zarnowitz de HAR-X a 7d: pendiente 0.76 (pronósticos algo sobredispersos);
-    volatilidad media pronosticada 45.7% contra 42.7% realizada.
-- **Resultados económicos (preespecificados, objetivo 50%):** HAR-X 7d tiene Sharpe 0.89 con
-  drawdown −53% y exposición media 0.93, contra *buy & hold* 0.98 y −53%; IC de ΔSharpe
-  [−0.20, −0.01]. El pronóstico supera 50% solo el 28% del tiempo, así que la regla casi no
-  actúa.
-- **Sensibilidad *post hoc* (no preespecificada; no cuenta para el gate):** con objetivo de
-  30%, HAR-X 7d logra Sharpe 0.90, drawdown −43% y exposición 0.68. Una exposición constante
-  de 0.68 logra Sharpe 0.98 y drawdown −39%. El *timing* por volatilidad **no** añade valor
-  frente a simplemente invertir menos (IC de ΔSharpe [−0.30, +0.11]).
-- **Conclusión:** la volatilidad de BTC es predecible y HAR-X (con DVOL) es el mejor modelo
-  a 7 días. En 2022–2026 eso no se tradujo en mejor retorno ajustado por riesgo: los periodos
-  de alta volatilidad también fueron alcistas. El valor está en **comunicar el riesgo**
-  (rango esperado, régimen de volatilidad) y en el dimensionamiento que decida el usuario,
-  no en una estrategia automática.
-
----
-
-## Direcciones abiertas
-
-1. **Producto de riesgo basado en E-12:** exponer el pronóstico HAR-X de volatilidad a 7 días
-   y el rango esperado de precio (±σ̂·√(7/365)). Antes de mostrarlo como "validado", evaluar
-   la cobertura de esos intervalos (p. ej. que el 68% de las semanas caiga dentro de ±1σ̂) y
-   recalibrar la pendiente de Mincer-Zarnowitz (0.76).
-2. **Holdout de noviembre (E-06):** evaluarlo a partir del 2026-12-02 tal como está congelado.
-3. **Datos de pago o de alta frecuencia** (skew histórico, libro de órdenes, liquidaciones):
-   la única vía direccional que no se ha probado.
-4. **No priorizar:** ensembles, deep learning o más features gratuitas para dirección (E-07 a
-   E-11 cubren ese espacio, con PBO de 0.63–0.78).
+1. **Predecir volatilidad en lugar de dirección.** La volatilidad sí es persistente y
+   predecible. Las estrategias largo/plano de E-08 y E-09 reducen el drawdown (−32% contra
+   −53%) con un Sharpe similar a *buy & hold*. Un modelo de volatilidad para dimensionar la
+   exposición (*volatility targeting*) es la hipótesis con mejor fundamento.
+2. **Clasificación de régimen** (bajista o alcista) como variable de control, en lugar de
+   predecir la dirección vela a vela. E-09 muestra un desempeño muy dependiente del régimen.
+3. **Holdout de noviembre (E-06):** evaluarlo después del 2026-12-02 tal como está congelado,
+   aunque se espera ≈ baseline.
+4. **Fase 3 del plan (ensembles, meta-labeling):** baja probabilidad previa; sin señal en las
+   features, combinar modelos no la crea. No priorizar.
 
 ## Plantilla para nuevas entradas
 

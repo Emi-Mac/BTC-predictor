@@ -75,13 +75,6 @@ log-loss **y** accuracy.
 | C6 `cross_asset` | Retorno ETH/BTC de 7/30 días; retornos de 20 días del S&P 500, DXY y oro; z-score de 60 días del VIX | ETHBTC al cierre; macro D+1 | +0.15 pp | −0.49 pp | peor | No |
 | Todas (`all`) | 111 columnas | — | −0.41 pp | −0.55 pp | mucho peor (−0.043) | No |
 
-| C3b `options` (E-10, snapshot v2) | `dvol`, `dvol_change_1d`, `dvol_change_7d`, `dvol_zscore_90d`, `variance_risk_premium_30d` (DVOL − volatilidad realizada de 30 días), `implied_realized_ratio_7d` | DVOL horario al cerrar la hora | −0.51 pp | +0.67 pp | peor | No |
-
-**Uso en volatilidad (E-12):** el DVOL y las variables de HAR-X (VIX, funding de 7 días, OI de
-7 días, drawdown, |retorno de 1 día|, volumen relativo, FOMC) **sí** mejoran el pronóstico de
-la volatilidad a 7 días frente a HAR (QLIKE −0.025, IC > 0). Las features que no anticipan la
-dirección sí informan sobre el riesgo.
-
 **Estabilidad de coeficientes (área D):** con todas las familias, los coeficientes de mayor
 magnitud conservan el signo en los 48 folds. A 3d destacan el percentil anual de volatilidad
 (+), la volatilidad de 30 días (−), el retorno de 90 días (+), el drawdown de 90 días (−), el

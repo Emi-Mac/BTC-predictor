@@ -9,7 +9,6 @@ Cada familia declara cuándo está disponible cada dato y se alinea al instante 
 - `onchain` (C4): actividad, valoración, flujos a exchanges y oferta de stablecoins.
 - `events` (C5): calendario programado del FOMC y vencimientos mensuales de opciones.
 - `cross_asset` (C6): ETH/BTC y transformaciones macro de 20–60 días.
-- `options` (C3b): volatilidad implícita DVOL de Deribit y prima de varianza.
 """
 
 from __future__ import annotations
@@ -121,14 +120,6 @@ FAMILIES: dict[str, list[str]] = {
         "gold_return_20d",
         "vix_zscore_60d",
     ],
-    "options": [
-        "dvol",
-        "dvol_change_1d",
-        "dvol_change_7d",
-        "dvol_zscore_90d",
-        "variance_risk_premium_30d",
-        "implied_realized_ratio_7d",
-    ],
 }
 STATIONARY_BASE = [c for c in BASE_COLUMNS if c not in NONSTATIONARY_COLUMNS]
 # Supuestos de disponibilidad (documentados también en docs/research/data-sources.md).
@@ -141,8 +132,6 @@ ONCHAIN_MAX_AGE = timedelta(days=5)
 MACRO_DELAY = timedelta(days=1)
 MACRO_MAX_AGE = timedelta(days=5)
 MAX_EVENT_DAYS = 60.0
-HOUR = pd.Timedelta(hours=1)
-OPTIONS_MAX_AGE = timedelta(hours=6)
 
 
 def stationary_feature_set() -> list[str]:
@@ -460,38 +449,6 @@ def cross_asset_features(
     return out
 
 
-# ─── C3b: opciones ───────────────────────────────────────────────────────────
-
-
-def realized_volatility(close: pd.Series, window: int) -> pd.Series:
-    """Volatilidad anualizada de retornos logarítmicos de 4h hasta el cierre de cada vela."""
-    returns = np.log(close).diff()
-    result: pd.Series = returns.rolling(window, min_periods=window).std() * np.sqrt(
-        PERIODS_PER_YEAR
-    )
-    return result
-
-
-def options_features(open_times: pd.Series, close: pd.Series, dvol: pd.DataFrame) -> pd.DataFrame:
-    """DVOL horario (disponible al cerrar la hora) frente a la volatilidad realizada."""
-    implied = _complete_grid(dvol, "open_time", HOUR)["close"].astype(float) / 100
-    values = pd.DataFrame(index=implied.index)
-    values["dvol"] = implied
-    values["dvol_change_1d"] = _log_change(implied, 24)
-    values["dvol_change_7d"] = _log_change(implied, 168)
-    values["dvol_zscore_90d"] = _zscore(implied, 2160, 720)
-    available = pd.Series(values.index + HOUR)
-    out = asof_align(open_times, values.reset_index(drop=True), available, OPTIONS_MAX_AGE)
-    times = pd.to_datetime(open_times, utc=True)
-    realized_30d = realized_volatility(close, 180).reindex(times).to_numpy()
-    realized_7d = realized_volatility(close, 42).reindex(times).to_numpy()
-    out["variance_risk_premium_30d"] = out["dvol"].to_numpy() - realized_30d
-    out["implied_realized_ratio_7d"] = out["dvol"].to_numpy() / np.where(
-        realized_7d > 0, realized_7d, np.nan
-    )
-    return out
-
-
 # ─── Ensamblado ──────────────────────────────────────────────────────────────
 
 
@@ -516,7 +473,6 @@ def build_long_horizon_features(
         onchain_features(times, aux["coinmetrics_btc"], aux["coinmetrics_stablecoins"]),
         event_features(times, aux["fomc"]),
         cross_asset_features(times, aux["ethbtc_klines"], sources["macro"]),
-        options_features(times, close, aux["deribit_dvol"]),
     ]
     added = pd.concat([part.reset_index(drop=True) for part in parts], axis=1)
     expected = [name for family in FAMILIES.values() for name in family]

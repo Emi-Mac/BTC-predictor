@@ -83,40 +83,6 @@ def reality_check(
     }
 
 
-def sharpe_difference_bootstrap(
-    first: FloatArray,
-    second: FloatArray,
-    block: int,
-    periods_per_year: int,
-    draws: int = 2000,
-    seed: int = 42,
-) -> dict[str, Any]:
-    """IC por bloques (remuestreo conjunto) de Sharpe(first) − Sharpe(second), anualizado."""
-    a = np.asarray(first, dtype=float)
-    b = np.asarray(second, dtype=float)
-    if a.shape != b.shape or len(a) < 3 or not np.isfinite(a).all() or not np.isfinite(b).all():
-        raise ValueError("Se requieren dos series finitas alineadas")
-
-    def sharpe(values: FloatArray) -> float:
-        std = float(values.std(ddof=1))
-        return float(values.mean()) / std * np.sqrt(periods_per_year) if std > 0 else 0.0
-
-    rng = np.random.default_rng(seed)
-    differences = np.empty(draws)
-    for index in range(draws):
-        rows = moving_block_indices(len(a), block, rng)
-        differences[index] = sharpe(a[rows]) - sharpe(b[rows])
-    lower, upper = np.quantile(differences, [0.025, 0.975])
-    return {
-        "difference": sharpe(a) - sharpe(b),
-        "ci_95": [float(lower), float(upper)],
-        "fraction_draws_above_zero": float((differences > 0).mean()),
-        "block": block,
-        "draws": draws,
-        "seed": seed,
-    }
-
-
 def simultaneous_lower_bounds(
     differences: FloatArray, block: int, draws: int = 2000, seed: int = 42, level: float = 0.95
 ) -> dict[str, Any]:

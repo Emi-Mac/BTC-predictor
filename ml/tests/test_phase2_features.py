@@ -100,13 +100,6 @@ def test_capture_is_immutable_verifiable_and_checks_checksums(tmp_path, monkeypa
             return f"{digest}  file.zip".encode()
         if url.endswith(".zip"):
             return payload
-        if url == aux_sources.DERIBIT_DVOL_URL:
-            first = params["end_timestamp"] > start_ms + 3_600_000 * 30
-            hour = start_ms + (3_600_000 * 24 if first else 0)
-            data = [[hour + i * 3_600_000, 50, 51, 49, 50.5] for i in range(24)]
-            return json.dumps(
-                {"result": {"data": data, "continuation": hour if first else None}}
-            ).encode()
         if url == aux_sources.COINMETRICS_URL:
             return json.dumps(stable if "usdt" in params["assets"] else page).encode()
         return (CALENDAR_HTML if "calendars" in url else HISTORICAL_HTML).encode()
@@ -120,9 +113,7 @@ def test_capture_is_immutable_verifiable_and_checks_checksums(tmp_path, monkeypa
         "coinmetrics_btc",
         "coinmetrics_stablecoins",
         "fomc",
-        "deribit_dvol",
     }
-    assert len(aux_sources.load(target)["deribit_dvol"]) == 48
     with pytest.raises(ValueError, match="finalizadas"):
         aux_sources.capture(target, "test", date(2021, 1, 1), date(2021, 2, 1))
     (target / "fomc.parquet").write_bytes(b"tampered")
@@ -212,16 +203,7 @@ def synthetic_inputs(days=520, seed=0):
     premium = pd.DataFrame({"open_time": times, "close": rng.normal(0, 1e-4, n)})
     ethbtc = pd.DataFrame({"open_time": times, "close": np.exp(rng.normal(0, 0.01, n).cumsum())})
     fomc = aux_sources.fomc_decisions(
-        [
-            d.date()
-            for d in pd.date_range(
-                "2019-12-01", (times[-1] + pd.Timedelta(days=90)).tz_localize(None), freq="45D"
-            )
-        ]
-    )
-    hours = pd.date_range(times[0] - pd.Timedelta(days=100), times[-1] + STEP, freq="1h")
-    dvol = pd.DataFrame(
-        {"open_time": hours, "close": 50 + rng.normal(0, 1, len(hours)).cumsum() * 0.1}
+        [d.date() for d in pd.date_range("2019-12-01", "2022-01-31", freq="45D")]
     )
     sources = {"candles": candles, "funding": funding, "macro": macro}
     aux = {
@@ -232,7 +214,6 @@ def synthetic_inputs(days=520, seed=0):
         "coinmetrics_btc": onchain,
         "coinmetrics_stablecoins": stable,
         "fomc": fomc,
-        "deribit_dvol": dvol,
     }
     return features, sources, metrics, aux
 
@@ -291,9 +272,6 @@ def test_long_horizon_features_never_use_unavailable_data():
         aux["coinmetrics_btc"],
         later(aux["coinmetrics_btc"]["time"], lh.ONCHAIN_DELAY),
         list(aux_sources.BTC_METRICS),
-    )
-    changed_aux["deribit_dvol"] = scramble(
-        aux["deribit_dvol"], later(aux["deribit_dvol"]["open_time"], lh.HOUR), ["close"]
     )
     stable = aux["coinmetrics_stablecoins"]
     changed_aux["coinmetrics_stablecoins"] = scramble(

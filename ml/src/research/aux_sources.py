@@ -5,7 +5,6 @@ Fuentes:
   perpetuo BTCUSDT, índice de prima del perpetuo y spot ETHBTC. Archivos mensuales con checksum.
 - CoinMetrics Community API: métricas on-chain diarias de BTC y oferta de USDT/USDC.
 - Reserva Federal: calendario de reuniones programadas del FOMC (publicado con antelación).
-- Deribit: índice de volatilidad implícita DVOL de BTC (velas horarias, desde 2021-03-24).
 
 Las fuentes se guardan crudas con su huella; los Parquet derivados y el manifiesto permiten
 verificar que un experimento usó exactamente los mismos datos.
@@ -55,8 +54,6 @@ BTC_METRICS = (
     "TxCnt",
 )
 STABLECOINS = ("usdt", "usdc")
-DERIBIT_DVOL_URL = "https://www.deribit.com/api/v2/public/get_volatility_index_data"
-DVOL_RESOLUTION_SECONDS = 3600
 FOMC_URLS = {
     "fomc_current": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
     "fomc_2020": "https://www.federalreserve.gov/monetarypolicy/fomchistorical2020.htm",
@@ -93,7 +90,6 @@ AVAILABILITY = {
         "revisiones históricas desconocidas"
     ),
     "fomc": "fechas programadas publicadas con antelación; decisión a las 14:00 de Nueva York",
-    "deribit_dvol": "cierre de la vela horaria disponible al terminar la hora; sin revisiones",
 }
 
 
@@ -214,19 +210,6 @@ def parse_coinmetrics(pages: list[dict[str, Any]], metrics: tuple[str, ...]) -> 
     return frame[columns].sort_values(columns[: -len(metrics)]).reset_index(drop=True)
 
 
-def parse_dvol(pages: list[dict[str, Any]]) -> pd.DataFrame:
-    """Velas horarias del DVOL ([ms, open, high, low, close]); elimina solapes entre páginas."""
-    rows = [row for page in pages for row in page.get("result", {}).get("data", [])]
-    if not rows:
-        raise ValueError("Deribit no devolvió datos de DVOL")
-    frame = pd.DataFrame(rows, columns=["open_time", "open", "high", "low", "close"])
-    frame["open_time"] = pd.to_datetime(frame["open_time"].astype("int64"), unit="ms", utc=True)
-    frame = frame.drop_duplicates("open_time").sort_values("open_time").reset_index(drop=True)
-    for column in ("open", "high", "low", "close"):
-        frame[column] = frame[column].astype(float)
-    return frame
-
-
 # ─── Descarga ────────────────────────────────────────────────────────────────
 
 
@@ -325,40 +308,6 @@ def _capture_coinmetrics(
     return parse_coinmetrics(pages, metrics)
 
 
-def _capture_dvol(
-    client: httpx.Client, directory: Path, start: date, end: date, raw: dict[str, Any]
-) -> pd.DataFrame:
-    """Pagina hacia atrás: cada respuesta trae hasta 1000 horas y la marca de continuación."""
-    start_ms = int(datetime.combine(start, time(0), tzinfo=UTC).timestamp() * 1000)
-    end_ms = int(datetime.combine(end, time(0), tzinfo=UTC).timestamp() * 1000) - 1
-    pages: list[dict[str, Any]] = []
-    cursor: int | None = end_ms
-    while cursor is not None and cursor > start_ms:
-        params: dict[str, str | int] = {
-            "currency": "BTC",
-            "start_timestamp": start_ms,
-            "end_timestamp": cursor,
-            "resolution": DVOL_RESOLUTION_SECONDS,
-        }
-        content = _get(client, DERIBIT_DVOL_URL, params)
-        stored = f"deribit_dvol/page-{len(pages):03d}.json"
-        raw[stored] = {
-            "url": f"{DERIBIT_DVOL_URL}?{httpx.QueryParams(params)}",
-            "sha256": _store_raw(directory, stored, content),
-            "checksum_verified": False,
-        }
-        page = json.loads(content)
-        if "result" not in page:
-            raise ValueError(f"Respuesta inválida de Deribit: {page.get('error')}")
-        pages.append(page)
-        following = page["result"].get("continuation")
-        if following is not None and following >= cursor:
-            raise ValueError("La paginación de Deribit no retrocede")
-        cursor = following
-    frame = parse_dvol(pages)
-    return frame.loc[frame["open_time"] < pd.Timestamp(end, tz="UTC")].reset_index(drop=True)
-
-
 def _capture_fomc(client: httpx.Client, directory: Path, raw: dict[str, Any]) -> pd.DataFrame:
     meetings: list[date] = []
     for name, url in FOMC_URLS.items():
@@ -409,7 +358,6 @@ def capture(directory: Path, aux_id: str, start: date, end: date) -> dict[str, A
             raw,
         )
         frames["fomc"] = _capture_fomc(client, directory, raw)
-        frames["deribit_dvol"] = _capture_dvol(client, directory, start, end, raw)
     files = {}
     coverage = {}
     for name, frame in frames.items():
