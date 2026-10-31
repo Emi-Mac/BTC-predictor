@@ -121,8 +121,8 @@ no demuestra la hora exacta de publicación ni conserva necesariamente versiones
 reciente dentro de `FUNDING_MAX_LAG_HOURS` (24 por defecto).
 
 La consulta de interés abierto reciente de Binance funcionó, pero el endpoint rechazó solicitudes
-del inicio del histórico de 2023. No se fabrican valores para cubrir los años faltantes ni se
-utiliza interés abierto en el modelo histórico.
+del inicio del histórico de 2023. El interés abierto no se utiliza en el modelo operativo; la
+investigación aislada descrita abajo usa los archivos públicos históricos de futuros.
 
 ### 3c. Entrenamiento y evaluación (Fase 3)
 
@@ -133,7 +133,7 @@ docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-d
   ml-worker python -m src.training.run
 ```
 
-El experimento compara XGBoost y LSTM con tres baselines en diez meses completos de validación
+El experimento compara XGBoost y LSTM con cuatro baselines en diez meses completos de validación
 walk-forward. En cada fold se reservan meses anteriores separados para buscar hiperparámetros y
 ajustar la calibración Platt. Imputación, selección y escalado se ajustan solo con el train de
 cada división; las etiquetas que aún no se conocen al comienzo de la siguiente ventana se
@@ -199,6 +199,132 @@ informe se guarda en `ml/artifacts/taker-ablation-*/ablation.json`; cualquier va
 requiere un holdout posterior que todavía no se haya usado antes de considerar su promoción.
 La ablación de octubre de 2026 mostró 53,37 % con funding frente a 53,15 % sin él en desarrollo;
 esa diferencia es exploratoria y no cumple el margen de tres puntos sobre el baseline.
+
+#### Dataset versionado e investigación de interés abierto
+
+El dataset `btcusdt-20200901-20261001-v1` está aislado de las tablas operativas. Incluye velas,
+macro, Fear & Greed, funding y archivos diarios de métricas de futuros de Binance; conserva sus
+checksums, manifiestos y Parquet. No se rellena con velas sintéticas. Para preparar otro dataset
+con un ID nuevo, desde la raíz del proyecto:
+
+```bash
+# La construcción no reinicia ni recrea el worker ni PostgreSQL.
+docker compose --project-directory . -f infra/docker-compose.yml build ml-worker
+ID="btcusdt-20200901-20261001-v2"
+DATASET="/app/artifacts/datasets/$ID"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.metrics_archive \
+  --dataset-id "$ID" --start 2020-09-01 --end 2026-10-01
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.source_snapshot --directory "$DATASET"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.dataset finalize --directory "$DATASET"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.dataset verify --directory "$DATASET"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.provenance --dataset "$DATASET"
+```
+
+`--end` es exclusivo. Si se interrumpe la descarga, repetirla con `--resume` y los mismos
+parámetros; un dataset ya finalizado no se puede modificar ni volver a finalizar. La captura
+consulta las fuentes y lee el sentimiento de PostgreSQL, pero no escribe en la base operativa.
+`ml-research` es un servicio puntual: usa el código de la imagen, no monta el código local ni
+arranca otro scheduler. Construir de nuevo la imagen antes de un experimento si cambia el código.
+
+Las métricas de futuros se alinean suponiendo fin de intervalo cinco minutos después de
+`create_time`, más **48 horas de demora simulada** y con una antigüedad máxima de diez minutos.
+Los huecos no se rellenan con valores posteriores. En el dataset existente se encontraron 71
+días con huecos, 634 intervalos ausentes y 75.255 duplicados idénticos eliminados; también hay
+valores de posicionamiento faltantes. En 1.913 de 2.221 archivos, `Last-Modified` es posterior al
+plazo simulado. Eso no demuestra que los valores hayan cambiado, pero tampoco acredita qué
+versión estaba disponible en cada fecha: `point_in_time_verified` sigue siendo `false`.
+
+La ablación compara la base —indicadores, contexto de precio y funding—, la base con interés
+abierto y la base con interés abierto más posicionamiento. Ajusta la regularización en tres
+ventanas anteriores a cada uno de diez folds, con imputación y escalado aprendidos exclusivamente
+del entrenamiento:
+
+```bash
+DATASET="/app/artifacts/datasets/btcusdt-20200901-20261001-v1"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.oi_experiment \
+  --dataset "$DATASET" --development-end 2026-10-01T00:00:00Z
+```
+
+El informe y las predicciones se guardan en `ml/artifacts/oi-ablation-*/`. La regla condicional
+estima en entrenamiento la probabilidad de subida dada la dirección anterior; se informa por
+separado de la regla que siempre continúa esa dirección. El mejor baseline de cada fold es una
+comparación retrospectiva, no una estrategia única preseleccionada. Los intervalos bootstrap por
+fold son exploratorios: no corrigen la búsqueda múltiple ni la dependencia temporal.
+
+En los diez folds de desarrollo de noviembre de 2025 a agosto de 2026, la base obtuvo 53,62 %,
+la base con interés abierto 53,46 %, la variante con posicionamiento 53,33 % y el baseline
+condicional 53,51 %. El mejor baseline retrospectivo por fold promedió 55,57 %. La diferencia
+entre base y baseline condicional fue de solo 0,11 puntos porcentuales, con un intervalo
+bootstrap exploratorio de −1,76 a +2,15 puntos. No es evidencia de una mejora concluyente.
+
+La selección `base` ya está congelada para el período **2026-11-01 a 2026-12-01 UTC**, todavía
+no evaluado, en `ml/artifacts/oi-ablation-20261030T171037Z-b9bda9ee/frozen.json`. Su imagen
+local se etiquetó como `btc-predictor-ml-worker:oi-frozen-20261030`.
+
+Para una *nueva* reserva, etiquetar primero la imagen construida con otro nombre único,
+conservarla y seleccionar un período aún futuro y no utilizado. Este ejemplo no debe ejecutarse
+de nuevo para la reserva existente:
+
+```bash
+IMAGE="btc-predictor-ml-worker:mi-etiqueta-nueva"
+# Crear solo una etiqueta que aún no exista.
+docker image tag btc-predictor-ml-worker:latest "$IMAGE"
+IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
+export ML_RESEARCH_IMAGE="$IMAGE"
+EXP="/app/artifacts/oi-ablation-..."  # directorio devuelto por la ablación
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.oi_holdout freeze \
+  --experiment "$EXP" --dataset "$DATASET" \
+  --holdout-start AAAA-MM-DDT00:00:00Z --holdout-end AAAA-MM-DDT00:00:00Z \
+  --runtime-image "$IMAGE" --runtime-image-id "$IMAGE_ID"
+```
+
+La selección se ordena por accuracy media de desarrollo, log-loss y nombre. `frozen.json`
+guarda las huellas del dataset, historial, código, dependencias e imagen; evita reservas
+solapadas y los comandos de entrenamiento rechazan datos de un holdout pendiente. No eliminar
+la imagen etiquetada ni modificar la reserva. El ID de imagen registrado es informativo; se
+verifica la implementación y las versiones de paquetes al evaluar. El dataset original se
+finalizó antes de registrar la firma de su construcción; las nuevas versiones sí la registran
+y el evaluador exige que coincida con la implementación congelada.
+
+Para evaluar la reserva de noviembre, esperar al menos hasta el **2 de diciembre de 2026 UTC**
+y a que los archivos diarios estén disponibles. Extender el dataset anterior con un ID nuevo
+reutiliza copias verificadas de sus archivos y fuentes históricas. Descarga los días adicionales
+y usa un solapamiento al consultar macro y funding, sin reemplazar los valores anteriores:
+
+```bash
+IMAGE="btc-predictor-ml-worker:oi-frozen-20261030"
+export ML_RESEARCH_IMAGE="$IMAGE"
+EXP="/app/artifacts/oi-ablation-20261030T171037Z-b9bda9ee"
+BASE="/app/artifacts/datasets/btcusdt-20200901-20261001-v1"
+NEXT_ID="btcusdt-20200901-20261202-v2"
+NEXT="/app/artifacts/datasets/$NEXT_ID"
+# Comparar este ID con runtime_image_id en frozen.json antes de continuar.
+docker image inspect "$IMAGE" --format '{{.Id}}'
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.metrics_archive \
+  --dataset-id "$NEXT_ID" --start 2020-09-01 --end 2026-12-02 --seed-dataset "$BASE"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.source_snapshot --directory "$NEXT" --seed-dataset "$BASE"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.dataset finalize --directory "$NEXT"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.dataset verify --directory "$NEXT"
+docker compose --project-directory . -f infra/docker-compose.yml run --rm --no-deps \
+  ml-research python -m src.research.oi_holdout evaluate --experiment "$EXP" --dataset "$NEXT"
+```
+
+Si una descarga parcial se reanuda con `--resume`, conservar también `--seed-dataset`. El
+evaluador exige etiquetas completas, rechaza cambios en el historial o la implementación y
+escribe un `holdout.lock` antes de puntuar: no permite un segundo intento. Un error posterior al
+lock requiere investigación manual y no justifica volver a usar el período como independiente.
+No registra ni activa un modelo y la procedencia histórica no verificada impide su promoción.
 
 ### 4. Desarrollar el frontend
 

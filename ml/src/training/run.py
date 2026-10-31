@@ -20,6 +20,7 @@ from src.features.compute import FEATURE_COLUMNS
 from src.ingestion.binance import interval_to_timedelta
 from src.ingestion.run import configure_logging
 from src.training.data import load_training_data
+from src.training.holdouts import assert_no_reserved_training_data
 from src.training.registry import register_model
 from src.training.walk_forward import TrainingOptions, run_walk_forward
 
@@ -31,6 +32,11 @@ async def execute(artifact_root: Path) -> int:
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     try:
         dataset = await load_training_data(engine, settings)
+        assert_no_reserved_training_data(
+            Path(settings.model_artifact_dir),
+            dataset["open_time"],
+            interval_to_timedelta(settings.default_interval),
+        )
         checksum = hashlib.sha256(
             pd.util.hash_pandas_object(
                 dataset[["open_time", "target_label", "previous_direction", *FEATURE_COLUMNS]],

@@ -26,6 +26,7 @@ from src.ingestion.funding_repository import FundingRepository
 from src.ingestion.repository import IngestionRepository
 from src.ingestion.run import configure_logging
 from src.training.data import build_folds, load_training_data
+from src.training.holdouts import assert_no_reserved_training_data
 from src.training.research_models import Candidate, fit_candidate
 from src.training.snapshot import snapshot_hash
 
@@ -183,6 +184,11 @@ async def execute(
                 step,
                 timedelta(hours=settings.funding_feature_max_age_hours),
             )
+        assert_no_reserved_training_data(
+            Path(settings.model_artifact_dir),
+            data.loc[data["open_time"] < cutoff, "open_time"],
+            step,
+        )
         report = run_ablation(data, cutoff, step, include_lightgbm, include_funding)
         directory = (
             artifact_root / f"taker-ablation-{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}"

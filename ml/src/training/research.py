@@ -31,6 +31,7 @@ from src.ingestion.funding_repository import FundingRepository
 from src.ingestion.repository import IngestionRepository
 from src.ingestion.run import configure_logging
 from src.training.data import Fold, build_folds, load_training_data
+from src.training.holdouts import assert_no_reserved_training_data, assert_unused_holdout
 from src.training.registry import register_model
 from src.training.research_models import candidates, fit_candidate
 from src.training.snapshot import snapshot_hash
@@ -59,26 +60,6 @@ def _candidate_pool(
             include_funding=True,
         )
     return candidates(include_taker=include_taker, include_lightgbm=include_lightgbm)
-
-
-def assert_unused_holdout(
-    artifact_root: Path,
-    start: pd.Timestamp,
-    end: pd.Timestamp,
-    exclude: Path | None = None,
-) -> None:
-    """Impide volver a seleccionar o puntuar un período que ya se ha observado."""
-    if start.tzinfo is None or end.tzinfo is None or end <= start:
-        raise ValueError("El holdout requiere fechas válidas con zona horaria")
-    for metadata_path in artifact_root.glob("research-*/development.json"):
-        directory = metadata_path.parent
-        if directory == exclude or not (directory / "holdout.lock").exists():
-            continue
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        prior_start = pd.Timestamp(metadata["holdout_start"])
-        prior_end = pd.Timestamp(metadata["holdout_end_exclusive"])
-        if start < prior_end and prior_start < end:
-            raise ValueError(f"El holdout se solapa con una evaluación previa: {directory}")
 
 
 async def load_snapshot(
@@ -247,6 +228,7 @@ async def evaluate_holdout(
     candidate = next((item for item in candidate_pool if item.name == key), None)
     if candidate is None:
         raise ValueError("El candidato congelado no existe")
+    assert_no_reserved_training_data(directory.parent, data.iloc[fold.train]["open_time"], step)
     assert_unused_holdout(directory.parent, start, end, exclude=directory)
     lock = directory / "holdout.lock"
     with lock.open("x", encoding="utf-8") as file:
@@ -355,6 +337,11 @@ async def execute(args: argparse.Namespace) -> int:
             data = await load_snapshot(
                 engine, settings, start, end, args.include_taker, args.include_funding
             )
+            assert_no_reserved_training_data(
+                Path(settings.model_artifact_dir),
+                data.loc[data["open_time"] < start, "open_time"],
+                step,
+            )
             result = develop(
                 data,
                 start,
@@ -394,6 +381,7 @@ async def execute(args: argparse.Namespace) -> int:
         if args.command == "compare":
             from src.training.compare_holdout import compare_fixed_models
 
+            assert_unused_holdout(directory.parent, start, end, exclude=directory)
             result = compare_fixed_models(data, directory, Path(args.reference_directory))
             with (directory / "comparison.json").open("x", encoding="utf-8") as file:
                 json.dump(result, file, indent=2, allow_nan=False)
