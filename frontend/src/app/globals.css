@@ -41,18 +41,18 @@
 
 /* ── Utilidades financieras ──────────────────────────────── */
 @layer utilities {
-  /* Texto de precio positivo */
-  .text-bull {
+  /* Texto de precio positivo/negativo/neutro (nombres distintos a los
+     utilities de color auto-generados `text-bull`/`text-bear`/`text-neutral`
+     para evitar dependencias circulares en `@apply`). */
+  .price-up {
     @apply text-bull font-mono;
   }
 
-  /* Texto de precio negativo */
-  .text-bear {
+  .price-down {
     @apply text-bear font-mono;
   }
 
-  /* Texto de precio neutro */
-  .text-neutral-price {
+  .price-neutral {
     @apply text-neutral font-mono;
   }
 
@@ -67,6 +67,14 @@
   }
   .badge-down {
     @apply inline-flex items-center gap-1 rounded-md bg-bear-dim px-2 py-0.5 text-xs font-semibold text-bear;
+  }
+  .badge-neutral {
+    @apply inline-flex items-center gap-1 rounded-md bg-neutral-dim px-2 py-0.5 text-xs font-semibold text-neutral;
+  }
+
+  /* Skeleton de carga */
+  .skeleton {
+    @apply animate-pulse rounded-md bg-bg-elevated;
   }
 }
 

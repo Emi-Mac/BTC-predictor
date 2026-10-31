@@ -1,16 +1,30 @@
-// Placeholder de la página principal — se completará en Fase 5
+/** Dashboard principal: layout en grid según wireframe de la Fase 5. */
+import { Header } from "@/components/layout/Header";
+import { CandlestickChart } from "@/components/dashboard/CandlestickChart";
+import { CurrentPredictionCard } from "@/components/dashboard/CurrentPredictionCard";
+import { AccuracyPanel } from "@/components/dashboard/AccuracyPanel";
+import { PredictionHistoryTable } from "@/components/dashboard/PredictionHistoryTable";
+import { FeatureSnapshotPanel } from "@/components/dashboard/FeatureSnapshotPanel";
+
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="mb-2 text-3xl font-bold text-brand">BTC Direction Predictor</h1>
-        <p className="text-gray-400">Dashboard en construcción — Fase 5</p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-bg-surface px-4 py-2 text-sm text-gray-300">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-bull"></span>
-          Sistema operativo
+    <div className="flex min-h-screen flex-col">
+      <Header />
+
+      <div className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-12">
+        {/* Columna principal: gráfico + historial */}
+        <div className="flex flex-col gap-4 lg:col-span-8">
+          <CandlestickChart />
+          <PredictionHistoryTable />
+        </div>
+
+        {/* Columna lateral: predicción actual, métricas, features */}
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          <CurrentPredictionCard />
+          <AccuracyPanel />
+          <FeatureSnapshotPanel />
         </div>
       </div>
     </div>
   );
 }
-

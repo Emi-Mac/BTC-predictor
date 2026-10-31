@@ -209,6 +209,9 @@ npm run dev
 # → http://localhost:3000
 ```
 
+> Runbook detallado (variables de entorno, troubleshooting de registry/CORS/WebSocket):
+> [`docs/runbooks/frontend-runbook.md`](./docs/runbooks/frontend-runbook.md)
+
 ### 5. Instalar pre-commit hooks
 
 ```bash
