@@ -20,6 +20,9 @@ def test_create_scheduler_registers_prediction_job_with_interval_trigger():
     job = scheduler.get_job(scheduler_module.JOB_ID)
     assert job is not None
     assert isinstance(job.trigger, IntervalTrigger)
+    # Sondeo corto (no una vez por vela) para no perder velas si las features llegan tarde.
+    expected = min(scheduler_module.get_settings().prediction_poll_seconds, 4 * 3600)
+    assert job.trigger.interval.total_seconds() == expected
 
 
 def _patch_dependency_getters(monkeypatch, prediction_repo) -> None:

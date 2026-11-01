@@ -6,7 +6,7 @@ from decimal import Decimal
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.config.models import ComputedFeatureORM, OhlcvCandleORM
+from src.config.models import ComputedFeatureORM, ContextualFeatureORM, OhlcvCandleORM
 from src.domain.entities.feature import FeatureSnapshot
 from src.domain.ports.feature_repository_port import FeatureRepositoryPort
 
@@ -57,12 +57,34 @@ class PostgresFeatureRepository(FeatureRepositoryPort):
     async def get_vector_for_candle(
         self, candle_id: int, feature_names: list[str]
     ) -> list[float] | None:
+        """Vector en el orden del modelo; combina `computed_features` y `contextual_features`.
+
+        Devuelve `None` si falta la fila o cualquier valor (la vela aún no está lista).
+        """
+        stored_names = set(_feature_column_names())
+        stored = [name for name in feature_names if name in stored_names]
+        contextual = [name for name in feature_names if name not in stored_names]
+        values: dict[str, object] = {}
         async with self._sessionmaker() as session:
-            columns = [getattr(ComputedFeatureORM, name) for name in feature_names]
-            result = await session.execute(
-                sa.select(*columns).where(ComputedFeatureORM.candle_id == candle_id)
-            )
-            record = result.first()
-            if record is None or any(value is None for value in record):
-                return None
-            return [float(value) for value in record]
+            if stored:
+                result = await session.execute(
+                    sa.select(*(getattr(ComputedFeatureORM, name) for name in stored)).where(
+                        ComputedFeatureORM.candle_id == candle_id
+                    )
+                )
+                record = result.first()
+                if record is None:
+                    return None
+                values.update(zip(stored, record, strict=True))
+            if contextual:
+                payload = await session.scalar(
+                    sa.select(ContextualFeatureORM.feature_values).where(
+                        ContextualFeatureORM.candle_id == candle_id
+                    )
+                )
+                if payload is None:
+                    return None
+                values.update({name: payload.get(name) for name in contextual})
+        if any(values[name] is None for name in feature_names):
+            return None
+        return [float(values[name]) for name in feature_names]  # type: ignore[arg-type]

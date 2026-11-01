@@ -127,13 +127,18 @@ export function CandlestickChart() {
 
   return (
     <Card title="Gráfico BTC/USDT" className="h-full">
-      {candlesLoading ? (
-        <Skeleton className="h-[420px] w-full" />
-      ) : candlesError ? (
-        <ErrorState message="No se pudieron cargar las velas." />
-      ) : (
-        <div ref={containerRef} className="h-[420px] w-full" />
-      )}
+      {/* El contenedor debe existir desde el primer render: el chart se crea una sola vez
+          al montar y necesita el nodo; skeleton y error se superponen en lugar de reemplazarlo. */}
+      <div className="relative h-[420px] w-full">
+        <div ref={containerRef} className="absolute inset-0" />
+        {candlesLoading ? (
+          <Skeleton className="absolute inset-0 h-full w-full" />
+        ) : candlesError ? (
+          <div className="absolute inset-0 bg-bg-surface">
+            <ErrorState message="No se pudieron cargar las velas." />
+          </div>
+        ) : null}
+      </div>
     </Card>
   );
 }

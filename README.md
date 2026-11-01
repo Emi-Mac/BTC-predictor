@@ -151,6 +151,15 @@ mejor baseline de cada fold por más de 3 puntos porcentuales en promedio, como 
 del último fold por más de 2 puntos, o si falla algún otro criterio registrado. Un resultado
 por debajo de esos umbrales no es un modelo apto para promover.
 
+**Activación manual.** El entrenamiento nunca activa un modelo; se hace a propósito con
+`python -m src.training.activation --version N --reason "..."` (acepta `--dry-run`). El comando
+valida que el backend pueda servir el modelo, deja una sola versión activa y anota fecha y motivo
+en `model_registry.notes`. Hoy está activa la **versión 2** (regresión logística, 55.4 % en el
+holdout de octubre de 2026): es la de mayor accuracy medida, pero **no cumple los criterios de
+calidad** de arriba. Los modelos `expanded` necesitan el contexto de precio, que el ML worker
+guarda en `contextual_features` (migración `006`). Guía completa para levantar y operar todo en
+[full-stack-runbook.md](./docs/runbooks/full-stack-runbook.md).
+
 #### Investigación para mejorar la precisión
 
 El comando de investigación compara variantes predefinidas con XGBoost y regresión logística,

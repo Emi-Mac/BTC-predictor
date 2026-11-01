@@ -5,7 +5,7 @@ Usa Pydantic Settings para leer variables de entorno con validación estricta.
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import AnyUrl, PostgresDsn, field_validator, model_validator
+from pydantic import AnyUrl, Field, PostgresDsn, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # ── ML ───────────────────────────────────────────────────
     model_artifact_dir: str = "./ml/artifacts"
     active_model_version: int = 1
+    # Sondeo del ciclo de predicción; idempotente, así que basta con que sea corto respecto
+    # a la vela para emitir la predicción poco después de que el ML worker calcule features.
+    prediction_poll_seconds: int = Field(default=300, ge=30)
 
     # ── Binance ──────────────────────────────────────────────
     binance_base_url: AnyUrl = AnyUrl("https://api.binance.com")  # type: ignore[assignment]

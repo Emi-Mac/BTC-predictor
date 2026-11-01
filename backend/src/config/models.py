@@ -19,6 +19,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.config.database import Base
@@ -170,6 +171,24 @@ class ComputedFeatureORM(Base):
 
     # Relaciones
     candle: Mapped["OhlcvCandleORM"] = relationship(back_populates="features")
+
+
+class ContextualFeatureORM(Base):
+    """
+    Features contextuales por vela (JSONB) calculadas por el ML worker.
+    Complementan `computed_features` con señales derivadas en lote (contexto de precio).
+    Tabla: contextual_features
+    """
+    __tablename__ = "contextual_features"
+    __table_args__ = {"comment": "Features contextuales por vela calculadas por el ML worker"}
+
+    candle_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ohlcv_candles.id", ondelete="CASCADE"), primary_key=True
+    )
+    feature_values: Mapped[dict[str, float]] = mapped_column(JSONB, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ModelRegistryORM(Base):

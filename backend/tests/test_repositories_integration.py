@@ -16,7 +16,13 @@ from src.adapters.outbound.candle_repository import PostgresCandleRepository
 from src.adapters.outbound.feature_repository import PostgresFeatureRepository
 from src.adapters.outbound.model_registry_repository import PostgresModelRegistryRepository
 from src.adapters.outbound.prediction_repository import PostgresPredictionRepository
-from src.config.models import Base, ComputedFeatureORM, ModelRegistryORM, OhlcvCandleORM
+from src.config.models import (
+    Base,
+    ComputedFeatureORM,
+    ContextualFeatureORM,
+    ModelRegistryORM,
+    OhlcvCandleORM,
+)
 
 SYMBOL = "BTCUSDT"
 INTERVAL = "4h"
@@ -118,6 +124,37 @@ async def test_feature_repository_returns_none_when_a_requested_feature_is_null(
     vector = await repo.get_vector_for_candle(candle_id, ["macd", "rsi_14"])
 
     assert vector is None
+
+
+async def test_feature_repository_combines_contextual_features_in_model_order(sessionmaker):
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    candle_id = await _insert_candle(sessionmaker, base, 100.0)
+    async with sessionmaker() as session:
+        session.add(ComputedFeatureORM(candle_id=candle_id, rsi_14=55.5, is_weekend=True))
+        session.add(
+            ContextualFeatureORM(
+                candle_id=candle_id, feature_values={"return_1": 0.01, "candle_body": -0.002}
+            )
+        )
+        await session.commit()
+
+    repo = PostgresFeatureRepository(sessionmaker)
+    names = ["return_1", "rsi_14", "candle_body", "is_weekend"]
+
+    assert await repo.get_vector_for_candle(candle_id, names) == [0.01, 55.5, -0.002, 1.0]
+    assert await repo.get_vector_for_candle(candle_id, ["rsi_14", "missing"]) is None
+
+
+async def test_feature_repository_requires_contextual_row_for_contextual_features(sessionmaker):
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    candle_id = await _insert_candle(sessionmaker, base, 100.0)
+    async with sessionmaker() as session:
+        session.add(ComputedFeatureORM(candle_id=candle_id, rsi_14=55.5))
+        await session.commit()
+
+    repo = PostgresFeatureRepository(sessionmaker)
+
+    assert await repo.get_vector_for_candle(candle_id, ["rsi_14", "return_1"]) is None
 
 
 async def test_feature_repository_get_latest_excludes_metadata_columns(sessionmaker):

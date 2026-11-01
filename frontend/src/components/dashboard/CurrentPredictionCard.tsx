@@ -52,7 +52,9 @@ export function CurrentPredictionCard() {
 
   const intervalMs = latestCandle ? parseIntervalToMs(latestCandle.interval) : 4 * 60 * 60 * 1000;
   const openMs = new Date(prediction.candle_open_time).getTime();
-  const nextCloseMs = openMs + intervalMs;
+  // La predicción de la vela cerrada `open_time` es sobre la vela siguiente, que cierra
+  // dos intervalos después de la apertura de la vela usada como entrada.
+  const nextCloseMs = openMs + 2 * intervalMs;
   const isUp = prediction.direction === "UP";
 
   return (

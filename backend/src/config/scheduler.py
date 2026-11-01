@@ -66,9 +66,10 @@ def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     settings = get_settings()
     period_seconds = int(interval_to_timedelta(settings.default_interval).total_seconds())
+    poll_seconds = min(settings.prediction_poll_seconds, period_seconds)
     scheduler.add_job(
         run_prediction_tick,
-        IntervalTrigger(seconds=period_seconds),
+        IntervalTrigger(seconds=poll_seconds),
         id=JOB_ID,
         coalesce=True,
         max_instances=1,

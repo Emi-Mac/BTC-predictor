@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from src.features.compute import FEATURE_COLUMNS, compute_features
+from src.features.context_store import save_contextual_features
 from src.features.repository import FeatureRepository
 from src.ingestion.binance import interval_to_timedelta
 from src.ingestion.pipeline import run_ingestion
@@ -35,7 +36,10 @@ async def run_features(engine: AsyncEngine, settings: Settings) -> int:
     if complete.empty:
         raise ValueError("No hay filas con todas las features disponibles")
     log.info("features_computed", total=len(computed), incomplete=len(computed) - len(complete))
-    return await target.save(settings.btc_symbol, settings.default_interval, complete)
+    saved = await target.save(settings.btc_symbol, settings.default_interval, complete)
+    # Contexto de precio requerido por los modelos `expanded` servidos por el backend.
+    await save_contextual_features(engine, settings)
+    return saved
 
 
 async def run_cycle(repo: IngestionRepository, settings: Settings) -> None:
