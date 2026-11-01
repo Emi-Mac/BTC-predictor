@@ -193,6 +193,8 @@ Las direcciones abiertas están en el
 1. Mantener la dirección como indicador experimental y transparente.
 2. Construir como siguiente funcionalidad un **panel de riesgo**: volatilidad pronosticada a
    7 días con HAR-X y rango esperado de precio. Antes, validar la cobertura de sus intervalos.
+   Plan detallado: [volatility-integration-plan.md](./volatility-integration-plan.md). Uso en
+   trading real: [docs/trading](../trading/README.md).
 3. Evaluar el holdout de noviembre a partir del 2026-12-02.
 
 ## 5. Expectativas realistas

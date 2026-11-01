@@ -441,6 +441,16 @@ El historial completo de experimentos, la metodología, las fuentes y el catálo
 están en [docs/research](./docs/research/README.md). Consúltalo antes de proponer un
 experimento nuevo.
 
+#### Integración de la volatilidad y uso en trading real
+
+- [volatility-integration-plan.md](./docs/plans/volatility-integration-plan.md): plan para llevar
+  el pronóstico de volatilidad al backend y al dashboard (ramas, modelo de datos, endpoints,
+  componentes, validación y fases).
+- [docs/trading](./docs/trading/README.md): guía educativa para usar el proyecto en la vida real
+  (qué ofrece, viabilidad con costos, lectura de datos, estrategias, órdenes y tamaño de
+  posición, gestión de riesgo, plan operativo y automatización segura). **No es asesoría
+  financiera.**
+
 ### 4. Desarrollar el frontend
 
 ```bash

@@ -33,3 +33,5 @@ HAR-X con DVOL), aunque usarla para dimensionar la exposición no mejoró el Sha
 | [data-sources.md](./data-sources.md) | Fuentes, rangos, supuestos de disponibilidad y limitaciones conocidas |
 | [feature-catalog.md](./feature-catalog.md) | Todas las features con fórmula, disponibilidad y resultado observado |
 | [../plans/model-improvement-plan.md](../plans/model-improvement-plan.md) | Plan por fases y estado de cada fase |
+| [../plans/volatility-integration-plan.md](../plans/volatility-integration-plan.md) | Plan para integrar el pronóstico de volatilidad en el backend y el frontend |
+| [../trading/README.md](../trading/README.md) | Guía para usar los resultados en trading real (educativa) |

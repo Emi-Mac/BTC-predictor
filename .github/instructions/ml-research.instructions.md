@@ -14,6 +14,10 @@ Antes de proponer o ejecutar un experimento, lee [docs/research](../../docs/rese
 - [methodology.md](../../docs/research/methodology.md): 48 folds walk-forward con purga
   `h+1`, tres baselines por horizonte, gate de límites simultáneos (≥ +3 pp) y economía neta
   con funding.
+- Integración de la volatilidad en el stack: [volatility-integration-plan.md](../../docs/plans/volatility-integration-plan.md)
+  (incluye el procedimiento de merge con la rama de la Fase 4; un merge normal borra la
+  investigación). Guía de uso en trading: [docs/trading](../../docs/trading/README.md); si
+  cambian las cifras de evidencia, actualízala.
 - [data-sources.md](../../docs/research/data-sources.md) y
   [feature-catalog.md](../../docs/research/feature-catalog.md).
 
