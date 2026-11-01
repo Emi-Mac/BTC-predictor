@@ -20,7 +20,7 @@ from src.features.taker_flow import TAKER_FEATURE_COLUMNS
 from src.ingestion import run as ingestion_cli
 from src.ingestion.funding_repository import FundingRepository
 from src.ingestion.repository import IngestionRepository
-from src.ingestion.tables import metadata, ohlcv_candles
+from src.ingestion.tables import contextual_features, metadata, ohlcv_candles
 from tests.test_features import STEP
 
 pytest_plugins = ["tests.test_features"]
@@ -83,6 +83,10 @@ async def test_feature_pipeline_idempotence_and_atomic_rollback(
     assert data[FEATURE_COLUMNS].notna().all().all()
     assert data["target_label"].isna().sum() == 1
     assert await target.last_feature_open_time("BTCUSDT", "4h") == candles["open_time"].iloc[-1]
+    async with engine.connect() as conn:
+        contextual = (await conn.execute(sa.select(contextual_features))).mappings().all()
+    assert 0 < len(contextual) <= len(data)
+    assert set(contextual[-1]["feature_values"]) == set(PRICE_CONTEXT_COLUMNS)
     async with engine.connect() as conn:
         before = (
             await conn.execute(sa.select(table.c.id, table.c.macd).order_by(table.c.id))

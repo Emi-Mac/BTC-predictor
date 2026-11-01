@@ -1,10 +1,11 @@
 /**
  * Cliente HTTP centralizado para comunicarse con el backend FastAPI.
+ * Tipos alineados 1:1 con las entidades de dominio del backend (Fase 4).
  * Usa SWR para cache y revalidación automática.
  */
 import axios from "axios";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -37,7 +38,20 @@ apiClient.interceptors.response.use(
 export const fetcher = <T>(url: string): Promise<T> =>
   apiClient.get<T>(url).then((res) => res.data);
 
-// ── Tipos de respuesta de la API (se completarán en Fase 4) ───
+// ── Paginación genérica ─────────────────────────────────────────
+export interface PaginationMeta {
+  limit: number;
+  offset: number;
+  total: number;
+  has_more: boolean;
+}
+
+export interface Page<T> {
+  data: T[];
+  pagination: PaginationMeta;
+}
+
+// ── Tipos de respuesta de la API (alineados con el backend) ───
 export interface Candle {
   id: number;
   symbol: string;
@@ -49,53 +63,86 @@ export interface Candle {
   low: number;
   close: number;
   volume: number;
+  quote_volume: number | null;
+  num_trades: number | null;
 }
+
+export interface CandleWithChange extends Candle {
+  change_pct: number | null;
+}
+
+export type Direction = "UP" | "DOWN";
 
 export interface Prediction {
   id: number;
   candle_id: number;
+  candle_open_time: string;
   model_version: number;
-  predicted_direction: "UP" | "DOWN";
-  confidence_score: number;
-  raw_probability_up: number | null;
-  actual_direction: "UP" | "DOWN" | null;
-  is_correct: boolean | null;
+  direction: Direction;
+  confidence: number;
+  probability_up: number | null;
   predicted_at: string;
+  actual_direction: Direction | null;
+  is_correct: boolean | null;
   resolved_at: string | null;
-  status: ModelStatus;
+}
+
+export interface MonthlyAccuracy {
+  month: string; // "YYYY-MM"
+  accuracy: number | null;
+  total_predictions: number;
 }
 
 export interface AccuracyMetrics {
-  overall: number;
-  /** Accuracy del mejor baseline en el mismo período; mostrar siempre junto a `overall`. */
-  baseline_overall: number;
-  last_7d: number;
-  last_30d: number;
-  last_90d: number;
-  total_predictions: number;
-  correct_predictions: number;
+  overall: number | null;
+  last_30d: number | null;
+  last_7d: number | null;
+  total_resolved: number;
+  by_month: MonthlyAccuracy[];
 }
-
-/**
- * "experimental": no supera a los baselines con significancia (gate de docs/research).
- * "validated": superó el gate de desarrollo y un holdout independiente.
- */
-export type ModelStatus = "experimental" | "validated";
 
 export interface ModelMetadata {
   version: number;
   model_type: string;
-  val_accuracy: number;
-  val_f1: number;
-  baseline_accuracy: number;
-  best_baseline_accuracy: number;
-  beats_baseline: boolean;
-  status: ModelStatus;
-  evidence_url: string | null;
+  val_accuracy: number | null;
+  val_f1: number | null;
+  val_precision: number | null;
+  val_recall: number | null;
+  baseline_accuracy: number | null;
   trained_at: string;
   is_active: boolean;
+  feature_names: string[];
+  artifact_path: string | null;
+  scaler_path: string | null;
 }
 
-// ── WebSocket URL ──────────────────────────────────────────────
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+export interface FeatureSnapshot {
+  candle_id: number;
+  symbol: string;
+  interval: string;
+  open_time: string;
+  values: Record<string, number | boolean | null>;
+}
+
+// ── Endpoints (las claves también se usan como keys de SWR) ───────
+export const endpoints = {
+  candles: (limit = 200, offset = 0) => `/api/v1/candles?limit=${limit}&offset=${offset}`,
+  candlesLatest: "/api/v1/candles/latest",
+  predictionCurrent: "/api/v1/predictions/current",
+  predictionHistory: (limit = 20, offset = 0) =>
+    `/api/v1/predictions/history?limit=${limit}&offset=${offset}`,
+  metricsAccuracy: "/api/v1/metrics/accuracy",
+  metricsModel: "/api/v1/metrics/model",
+  featuresLatest: "/api/v1/features/latest",
+} as const;
+
+// ── WebSocket ──────────────────────────────────────────────────────
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+export const WS_LIVE_URL = `${WS_BASE}/ws/live`;
+
+export interface WsMessage {
+  type: "heartbeat" | "candle" | "prediction" | string;
+  data?: unknown;
+}
+
 

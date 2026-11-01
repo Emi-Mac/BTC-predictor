@@ -151,6 +151,15 @@ mejor baseline de cada fold por más de 3 puntos porcentuales en promedio, como 
 del último fold por más de 2 puntos, o si falla algún otro criterio registrado. Un resultado
 por debajo de esos umbrales no es un modelo apto para promover.
 
+**Activación manual.** El entrenamiento nunca activa un modelo; se hace a propósito con
+`python -m src.training.activation --version N --reason "..."` (acepta `--dry-run`). El comando
+valida que el backend pueda servir el modelo, deja una sola versión activa y anota fecha y motivo
+en `model_registry.notes`. Hoy está activa la **versión 2** (regresión logística, 55.4 % en el
+holdout de octubre de 2026): es la de mayor accuracy medida, pero **no cumple los criterios de
+calidad** de arriba. Los modelos `expanded` necesitan el contexto de precio, que el ML worker
+guarda en `contextual_features` (migración `006`). Guía completa para levantar y operar todo en
+[full-stack-runbook.md](./docs/runbooks/full-stack-runbook.md).
+
 #### Investigación para mejorar la precisión
 
 El comando de investigación compara variantes predefinidas con XGBoost y regresión logística,
@@ -460,6 +469,9 @@ npm run dev
 # → http://localhost:3000
 ```
 
+> Runbook detallado (variables de entorno, troubleshooting de registry/CORS/WebSocket):
+> [`docs/runbooks/frontend-runbook.md`](./docs/runbooks/frontend-runbook.md)
+
 ### 5. Instalar pre-commit hooks
 
 ```bash
@@ -508,7 +520,7 @@ btc-predictor/
 | 1 — Ingesta | Conectores Binance, yfinance, FGI | ✅ Completada |
 | 2 — Features | Indicadores técnicos y macroeconómicos | ✅ Completada |
 | 3 — Modelado | Walk-Forward, XGBoost, LSTM, ONNX | 🟡 Implementada; rendimiento pendiente |
-| 4 — API | FastAPI hexagonal + endpoints REST | 🔲 Pendiente |
+| 4 — API | FastAPI hexagonal + endpoints REST | ✅ Completada (80 tests, 88,5% coverage); benchmark de latencia de inferencia pendiente |
 | 5 — Frontend | Dashboard dark-mode + TradingView | 🔲 Pendiente |
 | 6 — Integración | E2E tests, hardening, model drift | 🔲 Pendiente |
 

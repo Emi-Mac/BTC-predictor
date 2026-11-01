@@ -199,7 +199,7 @@ Las direcciones abiertas están en el
 
 ## 5. Expectativas realistas
 
-- Todas las velas, horizonte 24h: 54–56% de accuracy *(no alcanzado en la Fase 1 con las features actuales: 51.1%)*.
+- Todas las velas, horizonte 24h: 54–56% de accuracy.
 - Cobertura selectiva del 25–40%: 57–62% de accuracy.
 - Resultados superiores a esos rangos deben tratarse como sospecha de leakage hasta demostrar lo contrario.
 - La viabilidad depende del profit factor neto, no solo del accuracy.

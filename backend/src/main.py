@@ -3,28 +3,43 @@ Entry point del backend FastAPI.
 Configura lifespan, middleware, routers y health checks.
 """
 import contextlib
-from collections.abc import AsyncIterator
+import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
+from src.adapters.inbound import (
+    candle_router,
+    feature_router,
+    metrics_router,
+    prediction_router,
+    register_error_handlers,
+    websocket_router,
+)
 from src.config.database import check_db_connection, engine
 from src.config.models import Base
+from src.config.scheduler import create_scheduler
 from src.config.settings import get_settings
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
+limiter = Limiter(key_func=get_remote_address, default_limits=[settings.backend_rate_limit])
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Gestiona el ciclo de vida de la aplicación:
-    - Startup: verifica DB y crea tablas en dev solo si está habilitado
-    - Shutdown: cierra pool de conexiones
+    - Startup: verifica DB, crea tablas en dev solo si está habilitado, arranca el scheduler
+    - Shutdown: detiene el scheduler y cierra el pool de conexiones
     """
     logger.info(
         "Starting BTC Predictor API",
@@ -46,9 +61,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables verified/created (development mode)")
 
+    scheduler = create_scheduler()
+    scheduler.start()
+    logger.info("Prediction scheduler started")
+
     yield  # ← La app corre aquí
 
     # Shutdown
+    scheduler.shutdown(wait=False)
     logger.info("Shutting down BTC Predictor API")
     await engine.dispose()
 
@@ -78,6 +98,31 @@ def create_app() -> FastAPI:
     if not settings.is_development:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
+    # Rate limiting (slowapi)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
+
+    # Logging estructurado de cada request
+    @app.middleware("http")
+    async def log_requests(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.info(
+            "request_handled",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=round(duration_ms, 2),
+        )
+        return response
+
+    # Manejo centralizado de errores de dominio → HTTP
+    register_error_handlers(app)
+
     # ── Health checks ────────────────────────────────────────
     @app.get("/health", tags=["System"], summary="Liveness check")
     async def health() -> JSONResponse:
@@ -90,11 +135,12 @@ def create_app() -> FastAPI:
         code = 200 if db_ok else 503
         return JSONResponse({"status": status, "database": db_ok}, status_code=code)
 
-    # ── Routers (se añadirán en Fases 4+) ───────────────────
-    # from src.adapters.inbound.candle_router import router as candle_router
-    # from src.adapters.inbound.prediction_router import router as prediction_router
-    # app.include_router(candle_router, prefix="/api/v1")
-    # app.include_router(prediction_router, prefix="/api/v1")
+    # ── Routers ──────────────────────────────────────────────
+    app.include_router(candle_router)
+    app.include_router(prediction_router)
+    app.include_router(metrics_router)
+    app.include_router(feature_router)
+    app.include_router(websocket_router)
 
     return app
 

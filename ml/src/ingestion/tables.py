@@ -1,6 +1,7 @@
 """Definiciones Core de las tablas que usa el ML worker (espejo de las migraciones Alembic)."""
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = sa.MetaData()
 
@@ -67,4 +68,17 @@ funding_rates = sa.Table(
     sa.Column("mark_price", sa.Numeric(20, 8)),
     sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.CheckConstraint("mark_price IS NULL OR mark_price > 0", name="ck_funding_mark_price"),
+)
+
+contextual_features = sa.Table(
+    "contextual_features",
+    metadata,
+    sa.Column(
+        "candle_id",
+        sa.BigInteger,
+        sa.ForeignKey("ohlcv_candles.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    sa.Column("feature_values", JSONB, nullable=False),
+    sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
 )

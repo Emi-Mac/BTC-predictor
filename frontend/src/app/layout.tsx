@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,9 +40,10 @@ export default function RootLayout({
           modelo son experimentales y pueden ser incorrectas.
         </div>
 
-        <main className="min-h-screen">{children}</main>
+        <Providers>
+          <main className="min-h-screen">{children}</main>
+        </Providers>
       </body>
     </html>
   );
 }
-

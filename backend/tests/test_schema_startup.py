@@ -40,9 +40,22 @@ async def test_lifespan_respects_schema_creation_flag(monkeypatch, development, 
         async def dispose(self):
             return None
 
+    class FakeScheduler:
+        def __init__(self):
+            self.started = False
+            self.shutdown_called = False
+
+        def start(self):
+            self.started = True
+
+        def shutdown(self, wait=False):
+            self.shutdown_called = True
+
     engine = Engine()
+    fake_scheduler = FakeScheduler()
     monkeypatch.setattr(main, "engine", engine)
     monkeypatch.setattr(main, "check_db_connection", AsyncMock(return_value=True))
+    monkeypatch.setattr(main, "create_scheduler", lambda: fake_scheduler)
     monkeypatch.setattr(
         main,
         "settings",
@@ -55,3 +68,5 @@ async def test_lifespan_respects_schema_creation_flag(monkeypatch, development, 
     async with main.lifespan(None):
         pass
     assert engine.created == expected
+    assert fake_scheduler.started is True
+    assert fake_scheduler.shutdown_called is True
