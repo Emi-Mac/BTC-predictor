@@ -17,6 +17,8 @@ from src.features.repository import FeatureRepository
 from src.ingestion.binance import interval_to_timedelta
 from src.ingestion.freshness import check_freshness, funding_is_stale
 from src.ingestion.funding_repository import FundingRepository
+from src.ingestion.live_sources import live_source_problems
+from src.volatility_config import get_volatility_settings
 
 if TYPE_CHECKING:
     from src.config import Settings
@@ -77,7 +79,11 @@ async def _watchdog_tick(
         funding_stale = funding_is_stale(
             latest_funding, now, timedelta(hours=settings.funding_max_lag_hours)
         )
-    if freshness.stale or features_stale or funding_stale:
+    live_problems: list[str] = []
+    live = get_volatility_settings()
+    if live.volatility_sources_enabled:
+        live_problems = await live_source_problems(repo.engine, settings, live, now)
+    if freshness.stale or features_stale or funding_stale or live_problems:
         log.warning(
             "ingestion_recovery_needed",
             latest=str(latest),
@@ -86,6 +92,7 @@ async def _watchdog_tick(
             latest_feature=str(latest_feature),
             latest_funding=str(latest_funding),
             funding_stale=funding_stale,
+            live_source_problems=live_problems,
         )
         await _safe_run(repo, settings, lock)
 

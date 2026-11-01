@@ -19,8 +19,10 @@ from src.ingestion.binance import interval_to_timedelta
 from src.ingestion.freshness import funding_is_stale
 from src.ingestion.funding_repository import FundingRepository
 from src.ingestion.integrity import check_candle_integrity
+from src.ingestion.live_sources import live_source_problems
 from src.ingestion.repository import IngestionRepository
 from src.ingestion.scheduler import serve
+from src.volatility_config import get_volatility_settings
 
 MIN_HISTORY_DAYS = 3 * 365
 
@@ -73,6 +75,11 @@ async def _run(command: str) -> int:
                     timedelta(hours=settings.funding_max_lag_hours),
                 ):
                     report.problems.append("el funding no está actualizado")
+            live = get_volatility_settings()
+            if live.volatility_sources_enabled:
+                report.problems.extend(
+                    await live_source_problems(engine, settings, live, datetime.now(UTC))
+                )
             print(  # noqa: T201
                 f"rows={report.rows} span_days={report.span_days:.0f} "
                 f"completeness={report.completeness:.4%} gaps={len(report.gaps)} "

@@ -139,3 +139,28 @@ volatilidad, sección «Cómo ejecutar»).
 docker compose --project-directory . -f infra/docker-compose.yml stop backend ml-worker
 # Ctrl+C en `npm run dev`
 ```
+
+## 8. Fuentes de volatilidad (rama `feature/prediccion-volatilidad`)
+
+La migración **007** crea `implied_volatility` (DVOL de Deribit, velas horarias cerradas),
+`open_interest` (Binance, 5 min) y `event_calendar` (reuniones del FOMC). El ML worker las
+ingesta tras las velas, con `VOLATILITY_SOURCES_ENABLED=true`; apagado por defecto.
+
+> **No aplicar la 007 a una base compartida con la rama de la Fase 4:** su Alembic no conoce esa
+> revisión y dejaría de arrancar. Usa una base y un stack propios para esta rama.
+
+```bash
+$C run --rm --no-deps -v "$PWD/backend:/app" backend alembic upgrade head   # llega a la 007
+# en .env: VOLATILITY_SOURCES_ENABLED=true; luego reiniciar el ml-worker
+docker exec btc_ml_worker python -m src.ingestion.run check   # incluye DVOL, OI y FOMC
+```
+
+- **DVOL:** solo se guardan velas ya cerradas (la hora en curso aún cambia). Se re-piden las
+  últimas 24 h en cada pasada; el primer arranque rellena desde 7 días antes de la primera vela.
+- **OI:** Binance solo conserva 30 días; el primer arranque trae 29. Con `startTime` y `endTime`
+  devuelve las **últimas** 500 filas del rango, por lo que el cliente pagina en ventanas.
+- **FOMC:** se refresca cada `FOMC_REFRESH_DAYS` (7) o en cuanto no queda una reunión futura.
+- **Salud:** `check` y el watchdog marcan DVOL u OI con más de `DVOL_MAX_LAG_HOURS` /
+  `OI_MAX_LAG_HOURS` (3 h) de rezago, o un calendario sin reuniones futuras.
+- Las filas son inmutables (`ON CONFLICT DO NOTHING`); `recorded_at` / `captured_at` indican
+  cuándo se leyó el dato, no cuándo estuvo disponible.

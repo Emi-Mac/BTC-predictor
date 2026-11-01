@@ -5,7 +5,7 @@
 > de volatilidad validado**: volatilidad esperada, rango de precio probable, régimen de riesgo
 > y una calculadora de tamaño de posición. Todo con la misma API (FastAPI) y el mismo dashboard
 > (Next.js).
-> **Estado:** propuesta; ninguna fase está implementada.
+> **Estado:** F0 y F1 implementadas en código (ver tabla de fases); F2–F7 pendientes.
 
 ## 1. Punto de partida (evidencia)
 
@@ -237,8 +237,8 @@ resultados.
 
 | Fase | Contenido | Esfuerzo | Criterio de salida |
 |---|---|---|---|
-| F0 | Merge de ramas según la sección 3 (punta probada `09d3d27`) | 0.5 d | Tests de las tres partes en verde; huellas intactas |
-| F1 | Ingesta en vivo (DVOL, OI, FOMC), migración 007, health checks | 2–3 d | Datos en vivo ≤ 3h de antigüedad durante 48h |
+| F0 ✅ | Merge de ramas según la sección 3 (punta probada `09d3d27`) | 0.5 d | Tests de las tres partes en verde; huellas intactas |
+| F1 🟡 | Ingesta en vivo (DVOL, OI, FOMC), migración 007, health checks | 2–3 d | Datos en vivo ≤ 3h de antigüedad durante 48h (código y pruebas listos; falta la observación de 48 h en un stack propio) |
 | F2 | Features compartidas, paridad, E-12b sin OI con reglas de producción, calibración, entrenamiento, registro (008) y activación | 3–4 d | Criterios 1–3 de la sección 9 |
 | F3 | Inferencia y resolución en el ML worker (009) | 1–2 d | Pronósticos idempotentes cada 4h; resolución correcta en test |
 | F4 | Backend: dominio, repositorio, servicios, endpoints, WS, pruebas | 2–3 d | Cobertura ≥ 80%; contratos documentados en `/docs` |

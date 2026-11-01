@@ -82,3 +82,36 @@ contextual_features = sa.Table(
     sa.Column("feature_values", JSONB, nullable=False),
     sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
 )
+
+implied_volatility = sa.Table(
+    "implied_volatility",
+    metadata,
+    sa.Column("currency", sa.String(10), primary_key=True),
+    sa.Column("open_time", sa.DateTime(timezone=True), primary_key=True),
+    sa.Column("close", sa.Numeric(12, 6), nullable=False),
+    sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.CheckConstraint("close > 0", name="ck_implied_volatility_close"),
+)
+
+open_interest = sa.Table(
+    "open_interest",
+    metadata,
+    sa.Column("symbol", sa.String(20), primary_key=True),
+    sa.Column("create_time", sa.DateTime(timezone=True), primary_key=True),
+    sa.Column("sum_open_interest", sa.Numeric(30, 8), nullable=False),
+    sa.Column("sum_open_interest_value", sa.Numeric(30, 8), nullable=False),
+    sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.CheckConstraint(
+        "sum_open_interest >= 0 AND sum_open_interest_value >= 0",
+        name="ck_open_interest_non_negative",
+    ),
+)
+
+event_calendar = sa.Table(
+    "event_calendar",
+    metadata,
+    sa.Column("event_type", sa.String(30), primary_key=True),
+    sa.Column("event_time", sa.DateTime(timezone=True), primary_key=True),
+    sa.Column("source_url", sa.Text, nullable=False),
+    sa.Column("captured_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+)

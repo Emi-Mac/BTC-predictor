@@ -12,8 +12,10 @@ from src.ingestion.binance import BinanceKlinesClient, interval_to_timedelta
 from src.ingestion.cleaning import clean_candles, detect_gaps
 from src.ingestion.funding_client import BinanceFundingClient
 from src.ingestion.funding_repository import FundingRepository
+from src.ingestion.live_sources import ingest_live_sources
 from src.ingestion.market_data import fetch_fear_greed, fetch_macro_series
 from src.ingestion.time_utils import floor_to_step
+from src.volatility_config import get_volatility_settings
 
 if TYPE_CHECKING:
     from src.config import Settings
@@ -32,6 +34,7 @@ class IngestionSummary:
     macro_rows: int = 0
     fear_greed_rows: int = 0
     funding_rows: int = 0
+    live_sources: dict[str, int] | None = None
 
 
 async def ingest_candles(
@@ -163,6 +166,11 @@ async def run_ingestion(
             await step(repo, settings, summary)
         except Exception:
             log.exception("secondary_source_failed", source=name)
+
+    live = get_volatility_settings()
+    if live.volatility_sources_enabled:
+        live_summary = await ingest_live_sources(repo, settings, live)
+        summary.live_sources = live_summary.__dict__
 
     log.info("ingestion_done", **summary.__dict__)
     return summary
