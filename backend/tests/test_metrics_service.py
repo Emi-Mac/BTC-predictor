@@ -123,3 +123,37 @@ async def test_get_active_model_raises_not_found_when_no_active_model():
 
     with pytest.raises(NotFoundError):
         await service.get_active_model()
+
+
+@pytest.mark.asyncio
+async def test_active_model_reports_honest_status_and_baseline_comparison():
+    service = MetricsService(
+        FakePredictionRepository([], []), FakeModelRegistry(active=_model()), "experimental"
+    )
+    model = await service.get_active_model()
+    assert model.status == "experimental"
+    assert model.best_baseline_accuracy == pytest.approx(0.52)
+    assert model.beats_baseline is True
+    assert model.evidence_url == "docs/research/experiment-log.md"
+
+
+@pytest.mark.asyncio
+async def test_beats_baseline_is_false_or_unknown_when_evidence_is_missing():
+    worse = _model().model_copy(update={"val_accuracy": 0.51})
+    unknown = _model().model_copy(update={"baseline_accuracy": None})
+    for model, expected in ((worse, False), (unknown, None)):
+        service = MetricsService(FakePredictionRepository([], []), FakeModelRegistry(model))
+        assert (await service.get_active_model()).beats_baseline is expected
+
+
+@pytest.mark.asyncio
+async def test_accuracy_includes_the_trivial_baseline_of_the_same_period():
+    class WithBaseline(FakePredictionRepository):
+        async def majority_direction_share(self):
+            return 0.54
+
+    repo = WithBaseline([(60, 100), (20, 30), (5, 7)], [])
+    metrics = await MetricsService(repo, FakeModelRegistry(active=None)).get_accuracy()
+    assert metrics.baseline_overall == pytest.approx(0.54)
+    plain = FakePredictionRepository([(0, 0)] * 3, [])
+    assert (await MetricsService(plain, FakeModelRegistry(None)).get_accuracy()).baseline_overall is None

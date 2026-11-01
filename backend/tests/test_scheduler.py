@@ -99,3 +99,118 @@ async def test_run_prediction_tick_swallows_exceptions_so_the_scheduler_keeps_ru
 
     # No debe propagar la excepción: el siguiente tick programado debe poder reintentar.
     await scheduler_module.run_prediction_tick()
+
+
+# ── Difusión de volatilidad por WebSocket ────────────────────────────────────────────────
+
+
+def _volatility_forecast(open_time, version=1, bands=True):
+    from src.domain.entities.volatility import (
+        PriceBand,
+        PriceBands,
+        VolatilityForecast,
+    )
+
+    band = PriceBand(low=90.0, high=110.0)
+    return VolatilityForecast(
+        horizon="7d",
+        as_of=open_time,
+        candle_open_time=open_time,
+        reference_price=100.0,
+        vol_annual=0.5,
+        vol_horizon_pct=7.0,
+        regime="normal",
+        bands=PriceBands(p68=band, p90=band, p95=band) if bands else None,
+        dvol=None,
+        realized_vol_7d=None,
+        realized_vol_30d=None,
+        model_version=version,
+        fallback=None,
+        validation_status="in_validation",
+    )
+
+
+class _FakeVolatilityService:
+    def __init__(self, forecasts):
+        self.forecasts = forecasts
+
+    async def get_current(self, horizon):
+        from src.domain.exceptions import NotFoundError
+
+        forecast = self.forecasts.get(horizon)
+        if forecast is None:
+            msg = "sin pronóstico"
+            raise NotFoundError(msg)
+        return forecast
+
+
+@pytest.fixture
+def broadcasts(monkeypatch):
+    sent: list[dict] = []
+
+    async def fake_broadcast(message):
+        sent.append(message)
+
+    monkeypatch.setattr(scheduler_module.manager, "broadcast", fake_broadcast)
+    monkeypatch.setattr(scheduler_module, "_last_broadcast", {})
+    return sent
+
+
+@pytest.mark.asyncio
+async def test_volatility_tick_broadcasts_each_new_forecast_once(monkeypatch, broadcasts):
+    opened = datetime(2026, 1, 1, tzinfo=UTC)
+    service = _FakeVolatilityService({"7d": _volatility_forecast(opened)})
+    monkeypatch.setattr(scheduler_module, "get_volatility_service", lambda: service)
+
+    await scheduler_module.run_volatility_tick()
+    await scheduler_module.run_volatility_tick()  # mismo pronóstico: no se repite
+
+    assert len(broadcasts) == 1  # el horizonte 1d aún no tiene pronóstico
+    message = broadcasts[0]
+    assert message["type"] == "volatility"
+    assert message["data"]["horizon"] == "7d"
+    assert message["data"]["regime"] == "normal"
+    assert message["data"]["bands"]["p95"] == {"low": 90.0, "high": 110.0}
+
+    service.forecasts["7d"] = _volatility_forecast(opened.replace(hour=4))
+    service.forecasts["1d"] = _volatility_forecast(opened.replace(hour=4), bands=False)
+    await scheduler_module.run_volatility_tick()
+    assert [m["data"]["horizon"] for m in broadcasts[1:]] == ["1d", "7d"]
+    assert broadcasts[1]["data"]["bands"] is None
+
+
+@pytest.mark.asyncio
+async def test_volatility_tick_is_silent_when_disabled_and_resilient_to_failures(
+    monkeypatch, broadcasts
+):
+    from src.domain.exceptions import NotFoundError
+
+    def disabled():
+        msg = "deshabilitado"
+        raise NotFoundError(msg)
+
+    monkeypatch.setattr(scheduler_module, "get_volatility_service", disabled)
+    await scheduler_module.run_volatility_tick()
+
+    class Broken:
+        async def get_current(self, horizon):
+            msg = "boom"
+            raise RuntimeError(msg)
+
+    monkeypatch.setattr(scheduler_module, "get_volatility_service", lambda: Broken())
+    await scheduler_module.run_volatility_tick()  # no propaga
+    assert broadcasts == []
+
+
+def test_volatility_job_is_registered_only_when_enabled(monkeypatch):
+    real = scheduler_module.get_settings()
+    for enabled in (False, True):
+        monkeypatch.setattr(
+            scheduler_module,
+            "get_settings",
+            lambda enabled=enabled: real.model_copy(update={"volatility_enabled": enabled}),
+        )
+        scheduler = scheduler_module.create_scheduler()
+        job = scheduler.get_job(scheduler_module.VOLATILITY_JOB_ID)
+        assert (job is not None) is enabled
+        assert scheduler.get_job(scheduler_module.JOB_ID) is not None

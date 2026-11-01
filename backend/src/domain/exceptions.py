@@ -20,3 +20,7 @@ class ModelUnavailableError(DomainError):
 
 class InvalidFeatureVectorError(DomainError):
     """Las features disponibles no permiten construir un vector de inferencia válido."""
+
+
+class InvalidParameterError(DomainError):
+    """Parámetros de entrada fuera de rango o inconsistentes (HTTP 422)."""

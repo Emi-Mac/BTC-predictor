@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 Direction = Literal["UP", "DOWN"]
+# "experimental": no supera a los baselines con significancia (gate de docs/research).
+DirectionStatus = Literal["experimental", "validated"]
 
 
 class Prediction(BaseModel):
@@ -25,3 +27,4 @@ class Prediction(BaseModel):
     actual_direction: Direction | None = None
     is_correct: bool | None = None
     resolved_at: datetime | None = None
+    status: DirectionStatus = "experimental"

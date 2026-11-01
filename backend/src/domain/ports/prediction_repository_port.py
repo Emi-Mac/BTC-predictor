@@ -50,3 +50,10 @@ class PredictionRepositoryPort(ABC):
     @abstractmethod
     async def accuracy_by_month(self) -> list[MonthlyAccuracy]:
         """Devuelve el accuracy agregado por mes calendario, de más antiguo a más reciente."""
+
+    async def majority_direction_share(self) -> float | None:
+        """Fracción de la dirección más frecuente entre las predicciones resueltas.
+
+        Es el accuracy de la regla trivial «siempre esa dirección» sobre el mismo conjunto.
+        """
+        return None

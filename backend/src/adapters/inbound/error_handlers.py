@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from src.domain.exceptions import (
     InvalidFeatureVectorError,
+    InvalidParameterError,
     ModelUnavailableError,
     NotFoundError,
 )
@@ -30,6 +31,12 @@ async def _invalid_feature_vector_handler(
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
+async def _invalid_parameter_handler(
+    request: Request, exc: InvalidParameterError
+) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled_exception", path=request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
@@ -40,4 +47,5 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, _not_found_handler)
     app.add_exception_handler(ModelUnavailableError, _model_unavailable_handler)
     app.add_exception_handler(InvalidFeatureVectorError, _invalid_feature_vector_handler)
+    app.add_exception_handler(InvalidParameterError, _invalid_parameter_handler)
     app.add_exception_handler(Exception, _unhandled_exception_handler)

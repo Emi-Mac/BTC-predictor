@@ -89,3 +89,14 @@ async def test_get_history_returns_paginated_page():
     assert len(page.data) == 2
     assert page.pagination.total == 3
     assert page.pagination.has_more is True
+
+
+@pytest.mark.asyncio
+async def test_predictions_carry_the_configured_model_status():
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    repo = FakePredictionRepository([_prediction(1, now)])
+    assert (await PredictionService(repo).get_current()).status == "experimental"
+    validated = PredictionService(repo, "validated")
+    assert (await validated.get_current()).status == "validated"
+    history = await validated.get_history(10, 0)
+    assert [p.status for p in history.data] == ["validated"]

@@ -24,3 +24,5 @@ class AccuracyMetrics(BaseModel):
     last_7d: float | None
     total_resolved: int
     by_month: list[MonthlyAccuracy]
+    # Accuracy de la regla «siempre la dirección más frecuente» en el mismo conjunto resuelto.
+    baseline_overall: float | None = None

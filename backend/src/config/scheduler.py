@@ -21,13 +21,20 @@ from src.config.dependencies import (
     get_model_inference_adapter,
     get_model_registry_repository,
     get_prediction_repository,
+    get_volatility_service,
 )
 from src.config.settings import get_settings
+from src.domain.entities.volatility import Horizon
+from src.domain.exceptions import NotFoundError
 from src.domain.interval import interval_to_timedelta
 
 log = structlog.get_logger(__name__)
 
 JOB_ID = "prediction_cycle"
+VOLATILITY_JOB_ID = "volatility_broadcast"
+HORIZONS: tuple[Horizon, ...] = ("1d", "7d")
+# Último pronóstico difundido por horizonte: evita repetir el mismo mensaje en cada sondeo.
+_last_broadcast: dict[str, tuple[datetime, int]] = {}
 
 
 async def run_prediction_tick() -> None:
@@ -61,6 +68,36 @@ async def run_prediction_tick() -> None:
         log.exception("prediction_tick_failed")
 
 
+async def run_volatility_tick() -> None:
+    """Difunde por WebSocket cada pronóstico de volatilidad nuevo (uno por horizonte)."""
+    try:
+        service = get_volatility_service()
+        for horizon in HORIZONS:
+            try:
+                forecast = await service.get_current(horizon)
+            except NotFoundError:
+                continue  # el ML worker aún no emite pronósticos de este horizonte
+            marker = (forecast.candle_open_time, forecast.model_version)
+            if _last_broadcast.get(horizon) == marker:
+                continue
+            await manager.broadcast(
+                {
+                    "type": "volatility",
+                    "data": {
+                        "horizon": horizon,
+                        "vol_annual": forecast.vol_annual,
+                        "regime": forecast.regime,
+                        "bands": forecast.bands.model_dump() if forecast.bands else None,
+                    },
+                }
+            )
+            _last_broadcast[horizon] = marker
+    except NotFoundError:
+        return  # volatilidad deshabilitada
+    except Exception:
+        log.exception("volatility_tick_failed")
+
+
 def create_scheduler() -> AsyncIOScheduler:
     """Crea (sin iniciar) el scheduler con el job de predicción periódico."""
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -76,4 +113,14 @@ def create_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=600,
         next_run_time=datetime.now(UTC),
     )
+    if settings.volatility_enabled:
+        scheduler.add_job(
+            run_volatility_tick,
+            IntervalTrigger(seconds=poll_seconds),
+            id=VOLATILITY_JOB_ID,
+            coalesce=True,
+            max_instances=1,
+            misfire_grace_time=600,
+            next_run_time=datetime.now(UTC),
+        )
     return scheduler

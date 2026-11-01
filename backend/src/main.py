@@ -22,6 +22,8 @@ from src.adapters.inbound import (
     metrics_router,
     prediction_router,
     register_error_handlers,
+    risk_router,
+    volatility_router,
     websocket_router,
 )
 from src.config.database import check_db_connection, engine
@@ -140,6 +142,8 @@ def create_app() -> FastAPI:
     app.include_router(prediction_router)
     app.include_router(metrics_router)
     app.include_router(feature_router)
+    app.include_router(volatility_router)
+    app.include_router(risk_router)
     app.include_router(websocket_router)
 
     return app

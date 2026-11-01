@@ -214,3 +214,25 @@ docker exec btc_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c \
   "select horizon_candles, model_version, fallback_reason, forecast_vol_annual, regime, \
           k95, resolved_at is not null as resolved from volatility_forecasts order by id desc limit 6"
 ```
+
+### API de volatilidad (F4)
+
+Con `VOLATILITY_ENABLED=true` en el backend (y las migraciones 007–009 aplicadas) se exponen
+estos endpoints; con `false` (por defecto) responden 404 y no se programa la difusión WS, de modo
+que el backend puede convivir con una base sin esas tablas.
+
+| Método | Ruta | Contenido |
+|---|---|---|
+| GET | `/api/v1/volatility/current?horizon=1d\|7d` | Volatilidad anual y del horizonte, régimen, bandas 68/90/95% (`null` sin calibración suficiente), DVOL, realizada 7d/30d, `model_version`, `fallback`, `validation_status` |
+| GET | `/api/v1/volatility/history?horizon=&limit=&offset=` | Pronóstico vs realizado por vela, paginado |
+| GET | `/api/v1/metrics/volatility?horizon=` | Resueltos, cobertura 68/90/95%, QLIKE y QLIKE del ingenuo, pendiente de Mincer-Zarnowitz (≥ 30 resueltos) y cobertura de las últimas 12 semanas |
+| GET | `/api/v1/risk/position-size?capital=&risk_pct=&stop_k=&horizon=&side=` | Tamaño de posición para arriesgar `risk_pct`% hasta un stop a `stop_k`·σ; rechaza `risk_pct > 5`, capital ≤ 0 y `stop_k` fuera de (0, 10] con 422 |
+| WS | `/ws/live` | `{ "type": "volatility", "data": { horizon, vol_annual, regime, bands } }` una vez por pronóstico nuevo |
+
+- `validation_status` sigue en `in_validation` (`VOLATILITY_VALIDATION_STATUS`) hasta completar la
+  sombra prospectiva de 12 semanas; la calculadora lo advierte en `warnings`.
+- `/api/v1/metrics/model` y `/api/v1/predictions/*` añaden `status`
+  (`DIRECTION_MODEL_STATUS`, «experimental» por defecto), `beats_baseline`,
+  `best_baseline_accuracy` y `evidence_url`; `/api/v1/metrics/accuracy` añade `baseline_overall`
+  (la regla «siempre la dirección más frecuente» sobre las mismas predicciones resueltas).
+- La volatilidad no es una señal direccional: ninguna respuesta indica comprar o vender.

@@ -1,5 +1,5 @@
 """
-Modelos ORM de SQLAlchemy que mapean las 4 tablas de PostgreSQL.
+Modelos ORM de SQLAlchemy que mapean las tablas de PostgreSQL.
 Estos modelos son los únicos que conocen la estructura física de la DB.
 """
 from datetime import date, datetime
@@ -11,6 +11,8 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
+    Index,
     Integer,
     JSON,
     Numeric,
@@ -310,3 +312,117 @@ class FundingRateORM(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ImpliedVolatilityORM(Base):
+    """Índice DVOL de Deribit: velas horarias cerradas (escritas por el ML worker)."""
+
+    __tablename__ = "implied_volatility"
+    __table_args__ = (
+        CheckConstraint("close > 0", name="ck_implied_volatility_close"),
+        {"comment": "Índice de volatilidad implícita (DVOL de Deribit), velas horarias cerradas"},
+    )
+
+    currency: Mapped[str] = mapped_column(String(10), primary_key=True)
+    open_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    close: Mapped[float] = mapped_column(Numeric(12, 6), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class VolatilityModelORM(Base):
+    """Registro de modelos de volatilidad, separado de `model_registry`."""
+
+    __tablename__ = "volatility_models"
+    __table_args__ = (
+        UniqueConstraint("version", "horizon_candles", name="uq_volatility_models_version_horizon"),
+        CheckConstraint("kind IN ('har_x_live', 'har')", name="ck_volatility_models_kind"),
+        CheckConstraint("role IN ('primary', 'fallback')", name="ck_volatility_models_role"),
+        CheckConstraint("horizon_candles IN (6, 42)", name="ck_volatility_models_horizon"),
+        CheckConstraint("char_length(artifact_sha256) = 64", name="ck_volatility_models_sha256"),
+        Index(
+            "uq_volatility_models_active",
+            "horizon_candles",
+            "role",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ),
+        {"comment": "Modelos de pronóstico de volatilidad (HAR / HAR-X-live) por horizonte y rol"},
+    )
+
+    version: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    role: Mapped[str] = mapped_column(String(10), nullable=False)
+    horizon_candles: Mapped[int] = mapped_column(Integer, nullable=False)
+    artifact_path: Mapped[str] = mapped_column(String, nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    feature_names: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    validation_metrics: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(String)
+    trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class VolatilityForecastORM(Base):
+    """Pronóstico de volatilidad por vela y horizonte, con su resolución posterior."""
+
+    __tablename__ = "volatility_forecasts"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["model_version", "horizon_candles"],
+            ["volatility_models.version", "volatility_models.horizon_candles"],
+            name="fk_volatility_forecasts_model",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["requested_model_version", "horizon_candles"],
+            ["volatility_models.version", "volatility_models.horizon_candles"],
+            name="fk_volatility_forecasts_requested_model",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint(
+            "candle_id", "horizon_candles", name="uq_volatility_forecasts_candle_horizon"
+        ),
+        CheckConstraint(
+            "(fallback_reason IS NULL) = (model_version = requested_model_version)",
+            name="ck_volatility_forecasts_fallback",
+        ),
+        CheckConstraint(
+            "regime IN ('low', 'normal', 'high', 'extreme')", name="ck_volatility_forecasts_regime"
+        ),
+        {"comment": "Pronósticos de volatilidad y bandas por vela y horizonte, con su resolución"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    candle_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ohlcv_candles.id", ondelete="CASCADE"), nullable=False
+    )
+    horizon_candles: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    requested_model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    fallback_reason: Mapped[str | None] = mapped_column(String(100))
+    features_as_of: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    forecast_var_annual: Mapped[float] = mapped_column(Numeric(20, 10), nullable=False)
+    forecast_vol_annual: Mapped[float] = mapped_column(Numeric(20, 10), nullable=False)
+    k68: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    k90: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    k95: Mapped[float | None] = mapped_column(Numeric(12, 6))
+    calibration_window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    regime: Mapped[str] = mapped_column(String(10), nullable=False)
+    reference_price: Mapped[float] = mapped_column(Numeric(20, 8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    realized_var_annual: Mapped[float | None] = mapped_column(Numeric(20, 10))
+    realized_log_return: Mapped[float | None] = mapped_column(Numeric(20, 10))
+    inside_68: Mapped[bool | None] = mapped_column(Boolean)
+    inside_90: Mapped[bool | None] = mapped_column(Boolean)
+    inside_95: Mapped[bool | None] = mapped_column(Boolean)
+    qlike: Mapped[float | None] = mapped_column(Numeric(20, 10))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

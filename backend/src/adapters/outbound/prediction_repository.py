@@ -153,3 +153,17 @@ class PostgresPredictionRepository(PredictionRepositoryPort):
                 )
                 for row_month, total, correct in result
             ]
+
+    async def majority_direction_share(self) -> float | None:
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                sa.select(
+                    sa.func.count(),
+                    sa.func.sum(sa.case((PredictionLogORM.actual_direction == "UP", 1), else_=0)),
+                ).where(PredictionLogORM.resolved_at.is_not(None))
+            )
+            total, up = result.one()
+            if not total:
+                return None
+            share = int(up or 0) / int(total)
+            return max(share, 1 - share)

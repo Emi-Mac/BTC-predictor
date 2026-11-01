@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     # a la vela para emitir la predicción poco después de que el ML worker calcule features.
     prediction_poll_seconds: int = Field(default=300, ge=30)
 
+    # Estado honesto del modelo direccional: solo "validated" tras superar el gate de
+    # docs/research y un holdout independiente (hoy ninguno lo ha hecho).
+    direction_model_status: Literal["experimental", "validated"] = "experimental"
+
+    # ── Volatilidad (rama feature/prediccion-volatilidad; requiere migraciones 007-009) ──
+    volatility_enabled: bool = False
+    # «in_validation» hasta completar la sombra prospectiva de 12 semanas (plan, sección 9).
+    volatility_validation_status: Literal["in_validation", "validated"] = "in_validation"
+
     # ── Binance ──────────────────────────────────────────────
     binance_base_url: AnyUrl = AnyUrl("https://api.binance.com")  # type: ignore[assignment]
     btc_symbol: str = "BTCUSDT"
