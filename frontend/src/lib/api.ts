@@ -138,6 +138,103 @@ export interface FeatureSnapshot {
   values: Record<string, number | boolean | null>;
 }
 
+// ── Volatilidad y riesgo (no son una señal direccional) ───────────
+export type Horizon = "1d" | "7d";
+export type VolatilityRegime = "low" | "normal" | "high" | "extreme";
+/** «in_validation» hasta completar la sombra prospectiva de 12 semanas. */
+export type ValidationStatus = "in_validation" | "validated";
+
+export interface PriceBand {
+  low: number;
+  high: number;
+}
+
+export interface PriceBands {
+  p68: PriceBand;
+  p90: PriceBand;
+  p95: PriceBand;
+}
+
+export interface VolatilityForecast {
+  horizon: Horizon;
+  as_of: string;
+  candle_open_time: string;
+  reference_price: number;
+  vol_annual: number;
+  /** Desviación estándar del retorno a lo largo del horizonte, en %. */
+  vol_horizon_pct: number;
+  regime: VolatilityRegime;
+  /** `null` mientras no haya calibración suficiente. */
+  bands: PriceBands | null;
+  dvol: number | null;
+  realized_vol_7d: number | null;
+  realized_vol_30d: number | null;
+  model_version: number;
+  /** Motivo por el que se sirvió el modelo de respaldo, o `null` si fue el primario. */
+  fallback: string | null;
+  validation_status: ValidationStatus;
+}
+
+export interface VolatilityHistoryPoint {
+  candle_open_time: string;
+  as_of: string;
+  forecast_vol_annual: number;
+  realized_vol_annual: number | null;
+  regime: VolatilityRegime;
+  model_version: number;
+  fallback: string | null;
+  resolved: boolean;
+  inside_68: boolean | null;
+  inside_90: boolean | null;
+  inside_95: boolean | null;
+}
+
+export interface WindowCoverage {
+  weeks: number;
+  resolved: number;
+  coverage_68: number | null;
+  coverage_90: number | null;
+  coverage_95: number | null;
+}
+
+export interface VolatilityMetrics {
+  horizon: Horizon;
+  resolved: number;
+  coverage_68: number | null;
+  coverage_90: number | null;
+  coverage_95: number | null;
+  qlike: number | null;
+  qlike_naive: number | null;
+  mz_slope: number | null;
+  last_12w: WindowCoverage;
+  validation_status: ValidationStatus;
+}
+
+export type Side = "long" | "short";
+
+export interface PositionSize {
+  horizon: Horizon;
+  side: Side;
+  reference_price: number;
+  vol_horizon_pct: number;
+  stop_distance_pct: number;
+  stop_price: number;
+  risk_usd: number;
+  position_usd: number;
+  position_btc: number;
+  exposure_pct: number;
+  regime: VolatilityRegime;
+  warnings: string[];
+}
+
+export interface PositionSizeParams {
+  capital: number;
+  riskPct: number;
+  stopK: number;
+  horizon: Horizon;
+  side: Side;
+}
+
 // ── Endpoints (las claves también se usan como keys de SWR) ───────
 export const endpoints = {
   candles: (limit = 200, offset = 0) => `/api/v1/candles?limit=${limit}&offset=${offset}`,
@@ -148,14 +245,29 @@ export const endpoints = {
   metricsAccuracy: "/api/v1/metrics/accuracy",
   metricsModel: "/api/v1/metrics/model",
   featuresLatest: "/api/v1/features/latest",
+  volatilityCurrent: (horizon: Horizon) => `/api/v1/volatility/current?horizon=${horizon}`,
+  volatilityHistory: (horizon: Horizon, limit = 200, offset = 0) =>
+    `/api/v1/volatility/history?horizon=${horizon}&limit=${limit}&offset=${offset}`,
+  volatilityMetrics: (horizon: Horizon) => `/api/v1/metrics/volatility?horizon=${horizon}`,
+  positionSize: (p: PositionSizeParams) =>
+    `/api/v1/risk/position-size?capital=${p.capital}&risk_pct=${p.riskPct}` +
+    `&stop_k=${p.stopK}&horizon=${p.horizon}&side=${p.side}`,
 } as const;
+
+/** Prefijo común de las claves SWR de volatilidad (para invalidarlas juntas). */
+export const VOLATILITY_KEY_PREFIXES = ["/api/v1/volatility/", "/api/v1/metrics/volatility"];
+
+/** `true` si el backend respondió 404 (volatilidad deshabilitada o sin pronósticos aún). */
+export function isNotFound(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404;
+}
 
 // ── WebSocket ──────────────────────────────────────────────────────
 const WS_BASE = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
 export const WS_LIVE_URL = `${WS_BASE}/ws/live`;
 
 export interface WsMessage {
-  type: "heartbeat" | "candle" | "prediction" | string;
+  type: "heartbeat" | "candle" | "prediction" | "volatility" | string;
   data?: unknown;
 }
 

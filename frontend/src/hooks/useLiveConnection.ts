@@ -6,11 +6,17 @@
  *  - Reconexión automática con backoff exponencial + jitter (1s..30s).
  *  - Fallback a polling HTTP si falla 3 veces consecutivas (señaliza el
  *    status "polling" para que los componentes aumenten su refreshInterval de SWR).
- *  - Invalida las claves SWR relevantes cuando llegan eventos "candle" / "prediction".
+ *  - Invalida las claves SWR relevantes cuando llegan eventos "candle" / "prediction" / "volatility".
  */
 import { useEffect, useRef } from "react";
 import { mutate } from "swr";
-import { endpoints, WS_LIVE_URL, type CandleWithChange, type Prediction } from "@/lib/api";
+import {
+  endpoints,
+  VOLATILITY_KEY_PREFIXES,
+  WS_LIVE_URL,
+  type CandleWithChange,
+  type Prediction,
+} from "@/lib/api";
 import { backoffDelayMs } from "@/lib/utils";
 import { useConnectionStore } from "@/store/connectionStore";
 import { useMarketStore } from "@/store/useMarketStore";
@@ -122,6 +128,13 @@ export function useLiveConnection(): void {
             void mutate(endpoints.predictionCurrent);
             void mutate((key: string) => key.startsWith("/api/v1/predictions/history"));
           }
+          break;
+        case "volatility":
+          // Pronóstico nuevo: revalida pronóstico vigente, historial y calibración.
+          void mutate(
+            (key: unknown) =>
+              typeof key === "string" && VOLATILITY_KEY_PREFIXES.some((p) => key.startsWith(p)),
+          );
           break;
         case "heartbeat":
         default:

@@ -175,3 +175,23 @@ npm install
 ```
 
 
+
+## Panel de riesgo (volatilidad)
+
+El dashboard muestra, bajo la cuadrícula principal, el «Panel de riesgo» (`src/components/risk/`):
+volatilidad esperada, rango de precio probable (1d y 7d, 68/90/95%), historial pronosticado vs
+realizado (7d), calibración (cobertura real frente a la nominal, con alerta si se desvía más de
+5 pp con ≥ 30 resueltos) y la calculadora de tamaño de posición. El gráfico de velas proyecta las
+bandas de 68% y 95% a 7 días desde la última vela (curva √t, un punto por vela de 4h: el eje de
+`lightweight-charts` es por índice, no proporcional al tiempo).
+
+- Requiere el backend con `VOLATILITY_ENABLED=true`. Si responde 404 el panel se reduce a un aviso
+  y no se reintenta (`useVolatility` ignora los 404); el resto del dashboard no cambia.
+- La volatilidad no es una señal direccional: no se usan verde/rojo (régimen en azul, índigo,
+  ámbar y violeta) y todo texto aclara que describe riesgo, no dirección. La etiqueta «En
+  validación» se mantiene hasta que el backend informe `validated`.
+- El mensaje WS `volatility` invalida las claves SWR de volatilidad.
+- Para probarlo sin tocar el stack principal, levanta un backend propio (otro puerto y base) y
+  arranca el front con `NEXT_PUBLIC_API_URL=http://localhost:18000
+  NEXT_PUBLIC_WS_URL=ws://localhost:18000 npx next dev -p 3100` (añade ese origen a
+  `CORS_ORIGINS`). Recuerda detenerlo antes de `npm run build` en la misma carpeta.

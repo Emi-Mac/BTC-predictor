@@ -5,7 +5,7 @@
 > de volatilidad validado**: volatilidad esperada, rango de precio probable, régimen de riesgo
 > y una calculadora de tamaño de posición. Todo con la misma API (FastAPI) y el mismo dashboard
 > (Next.js).
-> **Estado:** F0–F4 implementadas (ver tabla de fases); F5–F7 pendientes.
+> **Estado:** F0–F5 implementadas (ver tabla de fases); F6–F7 pendientes.
 
 ## 1. Punto de partida (evidencia)
 
@@ -242,7 +242,7 @@ resultados.
 | F2 ✅ | Features compartidas, paridad, E-12b sin OI con reglas de producción, calibración, entrenamiento, registro (008) y activación | 3–4 d | Criterios 1–3 de la sección 9 (cumplidos a 7d; ver [E-12b](../research/experiment-log.md#e-12b-har_x_live-pronóstico-sin-oi-calibración-de-bandas-y-paridad-con-producción)) |
 | F3 ✅ | Inferencia y resolución en el ML worker (009) | 1–2 d | Pronósticos idempotentes cada 4h; resolución correcta en test (probado también de extremo a extremo con datos reales en una base temporal) |
 | F4 ✅ | Backend: dominio, repositorio, servicios, endpoints, WS, pruebas | 2–3 d | Cobertura ≥ 80% (96%); contratos documentados en `/docs` |
-| F5 | Frontend: panel de riesgo, bandas, historial, calibración, calculadora | 3–4 d | tsc, lint y build en verde; verificación en el navegador |
+| F5 ✅ | Frontend: panel de riesgo, bandas, historial, calibración, calculadora | 3–4 d | tsc, lint y build en verde; verificación en el navegador (hecha con datos reales) |
 | F6 | Sombra prospectiva (12 semanas de calendario) | Bajo | Criterio 4 de la sección 9 |
 | F7 | Documentación: runbook, `docs/trading`, registro E-13 | 1 d | Documentos actualizados con cifras reales de producción |
 

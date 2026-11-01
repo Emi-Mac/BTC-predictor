@@ -73,6 +73,9 @@ export function AccuracyPanel() {
         <MetricRow label="Últimos 7 días" value={accuracy.last_7d} />
         <MetricRow label="Últimos 30 días" value={accuracy.last_30d} />
         <MetricRow label="Histórico total" value={accuracy.overall} />
+        {accuracy.baseline_overall != null && (
+          <MetricRow label="Regla trivial (misma muestra)" value={accuracy.baseline_overall} />
+        )}
         <p className="text-right text-[11px] text-gray-500">
           {accuracy.total_resolved} predicciones resueltas
         </p>

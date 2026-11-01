@@ -7,10 +7,11 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 import {
   endpoints,
   fetcher,
+  type AccuracyMetrics,
   type CandleWithChange,
   type Prediction,
 } from "@/lib/api";
-import { formatCountdown, parseIntervalToMs, cn } from "@/lib/utils";
+import { formatAccuracy, formatCountdown, parseIntervalToMs, cn } from "@/lib/utils";
 import { usePredictionStore } from "@/store/usePredictionStore";
 import { DIRECTION_MODEL_STATUS } from "@/lib/modelStatus";
 import { ConfidenceGauge } from "./ConfidenceGauge";
@@ -26,6 +27,9 @@ export function CurrentPredictionCard() {
   );
   const { data: latestCandle } = useSWR<CandleWithChange>(endpoints.candlesLatest, fetcher, {
     refreshInterval: 60_000,
+  });
+  const { data: accuracy } = useSWR<AccuracyMetrics>(endpoints.metricsAccuracy, fetcher, {
+    refreshInterval: 5 * 60_000,
   });
   const livePrediction = usePredictionStore((s) => s.livePrediction);
   const prediction = livePrediction ?? data;
@@ -84,9 +88,16 @@ export function CurrentPredictionCard() {
 
         {(prediction.status ?? DIRECTION_MODEL_STATUS.status) === "experimental" && (
           <p className="rounded border border-yellow-700/60 px-3 py-2 text-center text-xs text-yellow-300">
-            Experimental — no supera a reglas simples ({DIRECTION_MODEL_STATUS.baselineName}:{" "}
-            {(DIRECTION_MODEL_STATUS.baselineAccuracy * 100).toFixed(1)}% vs{" "}
-            {(DIRECTION_MODEL_STATUS.accuracy * 100).toFixed(1)}%).
+            Experimental — no supera a reglas simples.{" "}
+            {accuracy?.overall != null && accuracy.baseline_overall != null
+              ? `Acierto histórico ${formatAccuracy(accuracy.overall)} frente a ${formatAccuracy(
+                  accuracy.baseline_overall,
+                )} de la regla «siempre la dirección más frecuente» (${accuracy.total_resolved} predicciones).`
+              : `En la investigación: ${(DIRECTION_MODEL_STATUS.accuracy * 100).toFixed(
+                  1,
+                )}% frente a ${(DIRECTION_MODEL_STATUS.baselineAccuracy * 100).toFixed(1)}% (${
+                  DIRECTION_MODEL_STATUS.baselineName
+                }).`}
           </p>
         )}
       </div>

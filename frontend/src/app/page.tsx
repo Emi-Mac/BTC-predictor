@@ -5,6 +5,7 @@ import { CurrentPredictionCard } from "@/components/dashboard/CurrentPredictionC
 import { AccuracyPanel } from "@/components/dashboard/AccuracyPanel";
 import { PredictionHistoryTable } from "@/components/dashboard/PredictionHistoryTable";
 import { FeatureSnapshotPanel } from "@/components/dashboard/FeatureSnapshotPanel";
+import { RiskPanel } from "@/components/risk/RiskPanel";
 
 export default function HomePage() {
   return (
@@ -24,6 +25,10 @@ export default function HomePage() {
           <AccuracyPanel />
           <FeatureSnapshotPanel />
         </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-[1600px] p-4 pt-0 sm:p-6 sm:pt-0">
+        <RiskPanel />
       </div>
     </div>
   );
