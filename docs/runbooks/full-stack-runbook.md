@@ -236,3 +236,40 @@ que el backend puede convivir con una base sin esas tablas.
   `best_baseline_accuracy` y `evidence_url`; `/api/v1/metrics/accuracy` añade `baseline_overall`
   (la regla «siempre la dirección más frecuente» sobre las mismas predicciones resueltas).
 - La volatilidad no es una señal direccional: ninguna respuesta indica comprar o vender.
+
+### Sombra prospectiva de 12 semanas (F6)
+
+Stack aislado (`infra/docker-compose.shadow.yml`, proyecto `btc-shadow`): base, red, volúmenes y
+puertos propios (PostgreSQL en 5433, API de inspección en 18100) y una imagen **inmutable** del
+worker (el código se copia, no se monta), de modo que lo evaluado no cambia durante las 12
+semanas. Operación con `infra/scripts/shadow.sh`:
+
+```bash
+infra/scripts/shadow.sh up       # imágenes, migraciones 001–009, entrena y activa 1d/7d, congela el protocolo, levanta el worker
+infra/scripts/shadow.sh status   # contenedores, modelos activos, pronósticos y salud de ingesta
+infra/scripts/shadow.sh report   # evalúa los criterios (guarda ml/artifacts/shadow/report-*.json)
+infra/scripts/shadow.sh api      # API de inspección en http://localhost:18100/docs
+infra/scripts/shadow.sh down     # detiene conservando la base;  destroy: la borra
+```
+
+`up` **inicia el reloj**: `ml/artifacts/shadow/manifest.json` congela criterios, modelos activos
+(con su SHA-256) y el commit, empieza a la siguiente medianoche UTC y no se reescribe. El primer
+arranque tarda unos minutos (backfill de 1,200 días de velas y de DVOL, OI y FOMC). Durante la
+sombra no se reentrena ni se cambia de modelo (`models_frozen` lo vigila) y la UI no la muestra.
+
+**Criterios** (`python -m src.volatility.shadow report`, ver el docstring del módulo):
+
+| Criterio | Regla |
+|---|---|
+| 1 día | 1 observación por día (vela de 00:00 UTC, ≈ 84): el IC binomial exacto del 95% de la cobertura de 68% y 90% debe contener el nivel nominal; muestra ≥ 90% de lo esperado |
+| 7 días | Solo monitoreo (vela de 00:00 UTC de los lunes, ≈ 12); sigue «en validación» hasta 26 semanas |
+| Ingesta | DVOL y OI registrados con ≤ 6 h de rezago y ningún hueco > 6 h entre pronósticos |
+| Respaldo | < 5% de los pronósticos servidos con HAR |
+
+Hasta cumplir las 12 semanas el informe es provisional (`in_progress`; `interim`: `on_track` o
+`failing`). Con 84 observaciones el IC es de ±10 pp: es una prueba de cordura, no de precisión.
+`recommended_validation_status` solo pasa a `validated` con la sombra aprobada **y** 26 semanas
+(entonces se cambia `VOLATILITY_VALIDATION_STATUS`).
+
+Este mismo stack sirve para la observación de 48 h de F1 (datos en vivo ≤ 3 h): `shadow.sh status`
+ejecuta `ingestion.run check`, que incluye DVOL, OI y calendario FOMC.

@@ -1,0 +1,120 @@
+# Stack aislado para la sombra prospectiva de volatilidad (F6, 12 semanas).
+#
+# Base de datos, red, volúmenes y puertos propios: no toca el stack principal ni su base.
+# El worker usa una imagen inmutable (el código se copia, NO se monta) para que lo evaluado no
+# cambie durante las 12 semanas. Operación: infra/scripts/shadow.sh
+name: btc-shadow
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: btc_shadow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SHADOW_POSTGRES_USER:-btcshadow}
+      POSTGRES_PASSWORD: ${SHADOW_POSTGRES_PASSWORD:?define SHADOW_POSTGRES_PASSWORD (lo genera shadow.sh)}
+      POSTGRES_DB: ${SHADOW_POSTGRES_DB:-btcshadow}
+    volumes:
+      - shadow_pg_data:/var/lib/postgresql/data
+    ports:
+      - "${SHADOW_POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHADOW_POSTGRES_USER:-btcshadow} -d ${SHADOW_POSTGRES_DB:-btcshadow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - shadow_network
+
+  # Aplica las migraciones hasta la 009 y termina.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    image: btc-predictor-backend:shadow
+    container_name: btc_shadow_migrate
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: &database_url postgresql+asyncpg://${SHADOW_POSTGRES_USER:-btcshadow}:${SHADOW_POSTGRES_PASSWORD}@postgres:5432/${SHADOW_POSTGRES_DB:-btcshadow}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - shadow_network
+
+  ml-worker:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    image: btc-predictor-ml-worker:shadow
+    container_name: btc_shadow_worker
+    restart: unless-stopped
+    environment: &ml_environment
+      DATABASE_URL: *database_url
+      VOLATILITY_SOURCES_ENABLED: "true"
+      MODEL_ARTIFACT_DIR: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      INGESTION_WATCHDOG_SECONDS: ${INGESTION_WATCHDOG_SECONDS:-60}
+      SHADOW_GIT_COMMIT: ${SHADOW_GIT_COMMIT:-unknown}
+    volumes:
+      - ./ml/artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "src.ingestion.run", "check"]
+      interval: 1m
+      timeout: 30s
+      retries: 3
+      start_period: 5m
+    networks:
+      - shadow_network
+
+  # Entrenamiento / activación / informe de la sombra (comandos puntuales).
+  ml-tools:
+    image: btc-predictor-ml-worker:shadow
+    profiles:
+      - tools
+    environment: *ml_environment
+    volumes:
+      - ./ml/artifacts:/app/artifacts
+    networks:
+      - shadow_network
+
+  # API opcional para inspeccionar los pronósticos (la sombra no se muestra en la UI).
+  backend:
+    image: btc-predictor-backend:shadow
+    container_name: btc_shadow_api
+    profiles:
+      - api
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: *database_url
+      ENVIRONMENT: development
+      BACKEND_AUTO_CREATE_SCHEMA: "false"
+      VOLATILITY_ENABLED: "true"
+      VOLATILITY_VALIDATION_STATUS: in_validation
+    volumes:
+      - ./backend/src:/app/src
+    ports:
+      - "${SHADOW_API_PORT:-18100}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - shadow_network
+
+volumes:
+  shadow_pg_data:
+    driver: local
+
+networks:
+  shadow_network:
+    driver: bridge

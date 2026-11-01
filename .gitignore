@@ -80,3 +80,4 @@ logs/
 # Alembic
 # No ignorar migrations/versions/*.py — son parte del código fuente
 
+infra/.shadow.env
