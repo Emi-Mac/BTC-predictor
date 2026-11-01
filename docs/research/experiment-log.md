@@ -318,6 +318,68 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
   (rango esperado, régimen de volatilidad) y en el dimensionamiento que decida el usuario,
   no en una estrategia automática.
 
+## E-12b `har_x_live`: pronóstico sin OI, calibración de bandas y paridad con producción
+
+- **Artefacto:** `ml/artifacts/volatility-live-20261101T190031Z-9cae2305/` · Comando:
+  `python -m src.volatility.study` · Código: [study.py](../../ml/src/volatility/study.py),
+  [features.py](../../ml/src/volatility/features.py),
+  [model.py](../../ml/src/volatility/model.py),
+  [calibration.py](../../ml/src/volatility/calibration.py). Mismos datos y 48 folds que E-12.
+- **Hipótesis:** el modelo servible en producción (`har_x_live`: HAR-X **sin** interés abierto,
+  porque el OI histórico solo es utilizable con 48 h de demora simulada y en vivo estaría
+  disponible al instante) conserva la ventaja de E-12; las bandas de precio calibradas de forma
+  conforme tienen la cobertura nominal; y la ruta de producción reproduce a la de investigación.
+- **Método (preespecificado en el plan, sección 9):**
+  - Criterio 1: `har_x_live` mejora a HAR en QLIKE a 7d con IC 95% por bloques de 180 velas > 0
+    y su QLIKE medio supera al de HAR-X en menos de 0.005.
+  - Criterio 2: multiplicadores `k_q` = cuantil conforme de `z = |log(P[t+h]/P[t])|/σ̂_h` entre
+    los pronósticos ya resueltos (`t' + h ≤ t`) de los últimos 2 años, con al menos 1,080
+    resueltos; cobertura de 68/90/95% evaluada solo donde hay multiplicadores y con IC por
+    bloques de 180 velas que debe contener el nivel nominal.
+  - Criterio 3: las entradas de `live_inputs` (tablas crudas) coinciden con las de la
+    investigación sobre todo el historial (1e-9) y sobre ventanas finales de 600 velas (25
+    puntos), y el pronóstico difiere menos de 1e-6 en términos relativos.
+  - Código compartido: `volatility_frame` y `model_inputs` pasaron a `src/volatility/features.py`
+    (E-12 los reutiliza). HAR y `har_x_live` se ajustan con el artefacto JSON de producción
+    (float64); HAR-X conserva el código de E-12.
+- **Resultados (QLIKE, menor es mejor):**
+
+  | Modelo | 1 día | 7 días |
+  |---|---|---|
+  | Ingenuo | 2.051 | 0.419 |
+  | HAR | 0.682 | 0.262 |
+  | HAR-X (con OI) | 0.667 | 0.237 |
+  | **HAR-X-live (sin OI)** | **0.666** | **0.236** |
+
+  - 7d: `har_x_live` frente a HAR mejora 0.026, IC [0.012, 0.037] y frente a HAR-X pierde
+    −0.0004 (es decir, no pierde): **criterio 1 cumplido.** Quitar el OI no cuesta nada.
+  - 1d: `har_x_live` frente a HAR mejora 0.016 con IC [−0.013, 0.039]: **a 1 día no se demuestra
+    ventaja sobre HAR**. El primario se registra igual, pero la activación a 1d es una decisión
+    explícita.
+- **Calibración (cobertura fuera de muestra, desde 2023-03):**
+
+  | Horizonte | Nivel | Conforme (IC 95%) | Gaussiano | ¿IC contiene el nominal? |
+  |---|---|---|---|---|
+  | 7d | 68% | 68.4% [63.8, 73.4] | 73.9% | sí |
+  | 7d | 90% | 91.1% [87.9, 94.6] | 88.9% | sí |
+  | 7d | 95% | 96.0% [94.1, 98.3] | 92.2% | sí |
+  | 1d | 68% | 67.5% [65.8, 69.2] | 72.9% | sí |
+  | 1d | 90% | 91.1% [90.1, 92.4] | 88.5% | **no** (conservadora) |
+  | 1d | 95% | 96.0% [95.2, 97.0] | 92.4% | **no** (conservadora) |
+
+  - **Criterio 2 cumplido a 7d (horizonte primario).** A 1d las bandas cubren ~1 pp de más
+    (conservadoras: más anchas de lo necesario); no se ajustan para no sobreajustar.
+  - Con los multiplicadores gaussianos la banda «del 95%» cubre 92.2% a 7d; los conformes
+    (k medios a 7d: 0.87 / 1.87 / 2.68) corrigen esa subcobertura. Por año a 7d el 68% oscila
+    entre 61.7% (2024) y 72.3% (2025): con ~52 semanas independientes por año el ruido es de
+    ±6 pp.
+- **Paridad:** diferencia máxima de entradas 0 en todo el historial y 5e-14 en ventanas
+  finales; diferencia relativa máxima del pronóstico 1.6e-15. **Criterio 3 cumplido.**
+- **Conclusión:** `har_x_live` queda **aceptado** para producción a 7d: sin OI iguala a HAR-X,
+  mejora a HAR y sus bandas conformes tienen la cobertura nominal. A 1d la ventaja sobre HAR
+  no está demostrada y las bandas son algo conservadoras. Pendiente: sombra prospectiva de 12
+  semanas (criterio 4) antes de llamarlo «validado».
+
 ---
 
 ## Direcciones abiertas

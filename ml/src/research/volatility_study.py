@@ -44,6 +44,16 @@ from src.research.dataset import verify_dataset
 from src.research.source_snapshot import file_sha256
 from src.training.holdouts import assert_no_reserved_training_data
 from src.training.research_models import _fit_preprocessor
+from src.volatility.features import (  # noqa: F401  (re-exportados para los tests y E-12)
+    EPSILON,
+    EWMA_HALFLIFE,
+    HAR_COLUMNS,
+    HAR_X_EXTRA,
+    HORIZONS,
+    STEP,
+    model_inputs,
+    volatility_frame,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -52,22 +62,8 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger(__name__)
 SEED = harness.SEED
-STEP = pd.Timedelta(hours=4)
-HORIZONS = {"1d": 6, "7d": 42}
 PRIMARY_HORIZON = "7d"
 PRIMARY_MODEL = "har_x"
-EWMA_HALFLIFE = 42
-HAR_COLUMNS = ["log_var_1d", "log_var_7d", "log_var_30d"]
-HAR_X_EXTRA = [
-    "log_dvol_var",
-    "log_vix",
-    "funding_sum_7d",
-    "oi_change_7d",
-    "drawdown_90d",
-    "abs_return_1d",
-    "volume_sma_ratio",
-    "fomc_next_72h",
-]
 LIGHTGBM_PARAMETERS: dict[str, Any] = {
     "max_depth": 3,
     "num_leaves": 8,
@@ -81,52 +77,17 @@ TARGET_VOLATILITY = 0.5
 REBALANCE_BAND = 0.1
 COST_BPS = 7.0
 BLOCK = 180
-EPSILON = 1e-12
 IMPLEMENTATION_FILES = (
     "research/volatility_study.py",
     "features/long_horizon.py",
     "research/aux_sources.py",
     "evaluation/economic.py",
     "evaluation/robustness.py",
+    "volatility/features.py",
 )
 
 
 # ─── Variables de volatilidad ────────────────────────────────────────────────
-
-
-def volatility_frame(close: pd.Series, open_times: pd.Series) -> pd.DataFrame:
-    """Varianzas anualizadas pasadas (conocidas en t) y futuras (objetivo) por fila."""
-    squared = np.log(close).diff() ** 2
-    out = pd.DataFrame(index=close.index)
-    for name, window in (("1d", 6), ("7d", 42), ("30d", 180)):
-        out[f"var_{name}"] = (
-            squared.rolling(window, min_periods=window).mean() * PERIODS_PER_YEAR_4H
-        )
-    out["var_ewma"] = (
-        squared.ewm(halflife=EWMA_HALFLIFE, adjust=False, min_periods=EWMA_HALFLIFE).mean()
-        * PERIODS_PER_YEAR_4H
-    )
-    for name, horizon in HORIZONS.items():
-        future = squared[::-1].rolling(horizon, min_periods=horizon).mean()[::-1].shift(-1)
-        out[f"target_var_{name}"] = future * PERIODS_PER_YEAR_4H
-    out["abs_return_1d"] = np.log(close).diff(6).abs()
-    out["forward_return"] = close.shift(-1) / close - 1
-    times = pd.to_datetime(open_times, utc=True)
-    return out.reindex(times).reset_index(drop=True)
-
-
-def model_inputs(enriched: pd.DataFrame, close: pd.Series) -> pd.DataFrame:
-    data = enriched.reset_index(drop=True).copy()
-    vol = volatility_frame(close, data["open_time"])
-    for column in vol:
-        data[column] = vol[column].to_numpy()
-    for name in ("1d", "7d", "30d"):
-        data[f"log_var_{name}"] = np.log(data[f"var_{name}"].clip(lower=EPSILON))
-    data["log_dvol_var"] = np.log((data["dvol"] ** 2).clip(lower=EPSILON))
-    data["log_vix"] = np.log(data["vix_close"].clip(lower=EPSILON))
-    for name in HORIZONS:
-        data[f"log_target_{name}"] = np.log(data[f"target_var_{name}"].clip(lower=EPSILON))
-    return data
 
 
 def development_rows(data: pd.DataFrame, cutoff: pd.Timestamp) -> pd.DataFrame:

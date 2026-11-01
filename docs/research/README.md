@@ -28,7 +28,7 @@ HAR-X con DVOL), aunque usarla para dimensionar la exposición no mejoró el Sha
 
 | Documento | Contenido |
 |---|---|
-| [experiment-log.md](./experiment-log.md) | Registro cronológico de los experimentos E-01…E-12 con hipótesis, método, resultados, artefactos y conclusiones |
+| [experiment-log.md](./experiment-log.md) | Registro cronológico de los experimentos E-01…E-12b con hipótesis, método, resultados, artefactos y conclusiones |
 | [methodology.md](./methodology.md) | Protocolo de evaluación: particiones, purga, baselines, inferencia, gates e integridad de holdouts |
 | [data-sources.md](./data-sources.md) | Fuentes, rangos, supuestos de disponibilidad y limitaciones conocidas |
 | [feature-catalog.md](./feature-catalog.md) | Todas las features con fórmula, disponibilidad y resultado observado |

@@ -164,3 +164,27 @@ docker exec btc_ml_worker python -m src.ingestion.run check   # incluye DVOL, OI
   `OI_MAX_LAG_HOURS` (3 h) de rezago, o un calendario sin reuniones futuras.
 - Las filas son inmutables (`ON CONFLICT DO NOTHING`); `recorded_at` / `captured_at` indican
   cuándo se leyó el dato, no cuándo estuvo disponible.
+
+### Modelos de volatilidad (F2)
+
+```bash
+# Evaluación E-12b: aceptación, calibración de bandas y paridad con producción
+docker exec btc_ml_worker python -m src.volatility.study \
+  --dataset artifacts/datasets/btcusdt-20200901-20261001-v1 \
+  --aux artifacts/aux-sources/aux-20190901-20261001-v2 --development-end 2026-10-01T00:00:00+00:00
+
+# Entrena primario (har_x_live) y respaldo (har) de un horizonte y los registra INACTIVOS (migración 008)
+docker exec btc_ml_worker python -m src.volatility.train --horizon 42 --register \
+  --dataset ... --aux ... --development-end ...        # --horizon 6 para 1 día
+
+# Activación explícita: solo cambia la versión activa del mismo horizonte y rol
+docker exec btc_ml_worker python -m src.volatility.activation --version 3 --dry-run
+docker exec btc_ml_worker python -m src.volatility.activation --version 3 --reason "E-12b aceptado"
+```
+
+- Los artefactos son JSON autocontenidos (coeficientes, varianza residual, umbrales de régimen,
+  métricas de validación y la semilla de calibración); la activación verifica su huella SHA-256.
+- A 1 día E-12b no demuestra ventaja de `har_x_live` sobre HAR: decide con esa evidencia a
+  la vista cuál activar como primario de 1d.
+- Por ahora el entrenamiento usa el dataset congelado; el reentrenamiento mensual desde
+  PostgreSQL llega con la inferencia en el worker (F3) reutilizando `live_inputs`.
