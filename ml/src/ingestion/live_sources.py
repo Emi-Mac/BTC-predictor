@@ -114,6 +114,37 @@ class LiveSourcesRepository:
             latest: datetime | None = (await conn.execute(query)).scalar()
         return latest
 
+    async def load_dvol(self, currency: str, since: datetime, until: datetime) -> pd.DataFrame:
+        """Velas de DVOL con `since < open_time ≤ until` (puntos de volatilidad, como float)."""
+        query = (
+            sa.select(implied_volatility.c.open_time, implied_volatility.c.close)
+            .where(
+                implied_volatility.c.currency == currency,
+                implied_volatility.c.open_time > since,
+                implied_volatility.c.open_time <= until,
+            )
+            .order_by(implied_volatility.c.open_time)
+        )
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(query)).all()
+        frame = pd.DataFrame(rows, columns=["open_time", "close"])
+        frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
+        frame["close"] = frame["close"].astype(float)
+        return frame
+
+    async def load_event_times(self, event_type: str) -> pd.DataFrame:
+        """Calendario de eventos como `decision_time` (formato de `event_features`)."""
+        query = (
+            sa.select(event_calendar.c.event_time)
+            .where(event_calendar.c.event_type == event_type)
+            .order_by(event_calendar.c.event_time)
+        )
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(query)).all()
+        frame = pd.DataFrame(rows, columns=["decision_time"])
+        frame["decision_time"] = pd.to_datetime(frame["decision_time"], utc=True)
+        return frame
+
     async def last_dvol_open_time(self, currency: str) -> datetime | None:
         query = sa.select(sa.func.max(implied_volatility.c.open_time)).where(
             implied_volatility.c.currency == currency

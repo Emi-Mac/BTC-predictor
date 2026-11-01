@@ -144,3 +144,74 @@ volatility_models = sa.Table(
         postgresql_where=sa.text("is_active"),
     ),
 )
+
+volatility_forecasts = sa.Table(
+    "volatility_forecasts",
+    metadata,
+    sa.Column("id", sa.BigInteger, sa.Identity(always=False), primary_key=True),
+    sa.Column(
+        "candle_id",
+        sa.BigInteger,
+        sa.ForeignKey("ohlcv_candles.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("horizon_candles", sa.Integer, nullable=False),
+    sa.Column("model_version", sa.Integer, nullable=False),
+    sa.Column("requested_model_version", sa.Integer, nullable=False),
+    sa.Column("fallback_reason", sa.String(100)),
+    sa.Column("features_as_of", JSONB, nullable=False),
+    sa.Column("forecast_var_annual", sa.Numeric(20, 10), nullable=False),
+    sa.Column("forecast_vol_annual", sa.Numeric(20, 10), nullable=False),
+    sa.Column("k68", sa.Numeric(12, 6)),
+    sa.Column("k90", sa.Numeric(12, 6)),
+    sa.Column("k95", sa.Numeric(12, 6)),
+    sa.Column("calibration_window_end", sa.DateTime(timezone=True)),
+    sa.Column("regime", sa.String(10), nullable=False),
+    sa.Column("reference_price", sa.Numeric(20, 8), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column("realized_var_annual", sa.Numeric(20, 10)),
+    sa.Column("realized_log_return", sa.Numeric(20, 10)),
+    sa.Column("inside_68", sa.Boolean),
+    sa.Column("inside_90", sa.Boolean),
+    sa.Column("inside_95", sa.Boolean),
+    sa.Column("qlike", sa.Numeric(20, 10)),
+    sa.Column("resolved_at", sa.DateTime(timezone=True)),
+    sa.ForeignKeyConstraint(
+        ["model_version", "horizon_candles"],
+        ["volatility_models.version", "volatility_models.horizon_candles"],
+        name="fk_volatility_forecasts_model",
+        ondelete="RESTRICT",
+    ),
+    sa.ForeignKeyConstraint(
+        ["requested_model_version", "horizon_candles"],
+        ["volatility_models.version", "volatility_models.horizon_candles"],
+        name="fk_volatility_forecasts_requested_model",
+        ondelete="RESTRICT",
+    ),
+    sa.UniqueConstraint(
+        "candle_id", "horizon_candles", name="uq_volatility_forecasts_candle_horizon"
+    ),
+    sa.CheckConstraint(
+        "(fallback_reason IS NULL) = (model_version = requested_model_version)",
+        name="ck_volatility_forecasts_fallback",
+    ),
+    sa.CheckConstraint(
+        "(k68 IS NULL) = (k90 IS NULL) AND (k90 IS NULL) = (k95 IS NULL) "
+        "AND (k68 IS NULL) = (calibration_window_end IS NULL)",
+        name="ck_volatility_forecasts_calibration",
+    ),
+    sa.CheckConstraint(
+        "(resolved_at IS NULL) = (realized_var_annual IS NULL) "
+        "AND (resolved_at IS NULL) = (realized_log_return IS NULL) "
+        "AND (resolved_at IS NULL) = (qlike IS NULL)",
+        name="ck_volatility_forecasts_resolution",
+    ),
+    sa.CheckConstraint(
+        "forecast_var_annual > 0 AND forecast_vol_annual > 0",
+        name="ck_volatility_forecasts_positive",
+    ),
+    sa.CheckConstraint(
+        "regime IN ('low', 'normal', 'high', 'extreme')", name="ck_volatility_forecasts_regime"
+    ),
+    sa.CheckConstraint("reference_price > 0", name="ck_volatility_forecasts_price"),
+)

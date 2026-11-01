@@ -79,26 +79,37 @@ def model_inputs(enriched: pd.DataFrame, close: pd.Series) -> pd.DataFrame:
     return data
 
 
+def _empty(frame: pd.DataFrame | None) -> bool:
+    return frame is None or frame.empty
+
+
 def live_inputs(
     base: pd.DataFrame,
     close: pd.Series,
-    funding: pd.DataFrame,
-    dvol: pd.DataFrame,
-    fomc: pd.DataFrame,
+    funding: pd.DataFrame | None,
+    dvol: pd.DataFrame | None,
+    fomc: pd.DataFrame | None,
 ) -> pd.DataFrame:
     """Entradas de `har_x_live` por vela, desde tablas crudas.
 
     `base`: `open_time`, `vix_close` y `volume_sma_ratio` por vela (columnas de
     `computed_features`, ya alineadas con la regla de disponibilidad del macro y del volumen).
     `close`: cierre spot 4h en rejilla completa. `funding`: `funding_time`, `funding_rate`.
-    `dvol`: `open_time`, `close` (puntos de volatilidad). `fomc`: `decision_time`.
+    `dvol`: `open_time`, `close` (puntos de volatilidad). `fomc`: `decision_time`. Una fuente
+    `None` o vacía deja su columna ausente (NaN) y el pronóstico usará el respaldo.
     """
     times = pd.to_datetime(base["open_time"], utc=True).reset_index(drop=True)
     enriched = pd.DataFrame({"open_time": times})
     for column in LIVE_BASE_COLUMNS:
         enriched[column] = base[column].to_numpy(dtype=float)
-    enriched["dvol"] = options_features(times, close, dvol)["dvol"].to_numpy()
-    enriched["funding_sum_7d"] = funding_features(times, funding)["funding_sum_7d"].to_numpy()
+    enriched["dvol"] = (
+        np.nan if _empty(dvol) else options_features(times, close, dvol)["dvol"].to_numpy()
+    )
+    enriched["funding_sum_7d"] = (
+        np.nan if _empty(funding) else funding_features(times, funding)["funding_sum_7d"].to_numpy()
+    )
     enriched["drawdown_90d"] = regime_features(times, close)["drawdown_90d"].to_numpy()
-    enriched["fomc_next_72h"] = event_features(times, fomc)["fomc_next_72h"].to_numpy()
+    enriched["fomc_next_72h"] = (
+        np.nan if _empty(fomc) else event_features(times, fomc)["fomc_next_72h"].to_numpy()
+    )
     return model_inputs(enriched, close)

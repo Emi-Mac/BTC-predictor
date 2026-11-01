@@ -12,6 +12,8 @@ from src.features.repository import FeatureRepository
 from src.ingestion.binance import interval_to_timedelta
 from src.ingestion.pipeline import run_ingestion
 from src.ingestion.repository import IngestionRepository
+from src.volatility.inference import run_volatility_cycle
+from src.volatility_config import get_volatility_settings
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncEngine
@@ -39,6 +41,9 @@ async def run_features(engine: AsyncEngine, settings: Settings) -> int:
     saved = await target.save(settings.btc_symbol, settings.default_interval, complete)
     # Contexto de precio requerido por los modelos `expanded` servidos por el backend.
     await save_contextual_features(engine, settings)
+    live = get_volatility_settings()
+    if live.volatility_sources_enabled:
+        await run_volatility_cycle(engine, settings, live)
     return saved
 
 

@@ -188,3 +188,29 @@ docker exec btc_ml_worker python -m src.volatility.activation --version 3 --reas
   la vista cuál activar como primario de 1d.
 - Por ahora el entrenamiento usa el dataset congelado; el reentrenamiento mensual desde
   PostgreSQL llega con la inferencia en el worker (F3) reutilizando `live_inputs`.
+
+### Pronósticos de volatilidad en vivo (F3)
+
+Con `VOLATILITY_SOURCES_ENABLED=true`, la migración 009 aplicada y modelos **activos**, cada ciclo
+del ML worker (`run_features`) hace dos cosas, cada una aislada de las fallas de la otra y de
+la predicción direccional:
+
+1. **Resolver** los pronósticos cuyo horizonte ya se cumplió: varianza realizada = media de los
+   cuadrados de los retornos log de las velas `t+1…t+h` (la definición del objetivo de
+   entrenamiento), retorno `log(c[t+h]/c[t])`, cobertura de las bandas y QLIKE. Solo se resuelve
+   con las `h` velas siguientes sin huecos y ya cerradas.
+2. **Pronosticar** la última vela cerrada a 6 y 42 velas, de forma idempotente por
+   (vela, horizonte). Se sirve el primario; si DVOL, funding, features de la vela, historial o el
+   calendario FOMC no cumplen su regla de frescura se sirve el respaldo HAR y se guardan
+   `fallback_reason` y `features_as_of` (marca de tiempo de cada fuente usada).
+
+Las bandas usan `k68/k90/k95` conformes: la semilla del artefacto más los pronósticos en vivo del
+mismo modelo ya resueltos (ventana de 2 años, mínimo 1,080). Si no hay suficientes, los
+multiplicadores quedan en `NULL` y la UI no debe mostrar bandas. Sin un primario activo para un
+horizonte no se emite pronóstico para ese horizonte.
+
+```bash
+docker exec btc_postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c \
+  "select horizon_candles, model_version, fallback_reason, forecast_vol_annual, regime, \
+          k95, resolved_at is not null as resolved from volatility_forecasts order by id desc limit 6"
+```

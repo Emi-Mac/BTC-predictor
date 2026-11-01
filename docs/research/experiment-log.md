@@ -320,7 +320,7 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
 
 ## E-12b `har_x_live`: pronóstico sin OI, calibración de bandas y paridad con producción
 
-- **Artefacto:** `ml/artifacts/volatility-live-20261101T190031Z-9cae2305/` · Comando:
+- **Artefacto:** `ml/artifacts/volatility-live-20261101T193928Z-4b5f6a4b/` · Comando:
   `python -m src.volatility.study` · Código: [study.py](../../ml/src/volatility/study.py),
   [features.py](../../ml/src/volatility/features.py),
   [model.py](../../ml/src/volatility/model.py),

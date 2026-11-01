@@ -12,6 +12,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from src.evaluation.robustness import block_bootstrap_mean
@@ -24,6 +25,7 @@ LEVELS = (0.68, 0.90, 0.95)
 WINDOW = pd.Timedelta(days=730)
 # Pronósticos resueltos mínimos para estimar multiplicadores (≈ 180 días de velas de 4h).
 MIN_RESOLVED = 1080
+BoolArray = npt.NDArray[np.bool_]
 GAUSSIAN_K = {0.68: 1.0, 0.90: 1.645, 0.95: 1.96}
 
 
@@ -61,15 +63,28 @@ def multipliers_at(
     `issued` y `resolved` son los instantes de emisión y de resolución de cada pronóstico
     pasado; solo cuentan los resueltos hasta `as_of` y emitidos dentro de la ventana.
     """
+    mask = eligible(as_of, issued, resolved, z, window)
+    values = np.asarray(z)[mask]
+    if len(values) < min_count:
+        return {level: float("nan") for level in levels}
+    return {level: conformal_quantile(values, level) for level in levels}
+
+
+def eligible(
+    as_of: pd.Timestamp,
+    issued: pd.Series,
+    resolved: pd.Series,
+    z: FloatArray,
+    window: pd.Timedelta = WINDOW,
+) -> BoolArray:
+    """Pronósticos usables en `as_of`: ya resueltos, dentro de la ventana y con z finito."""
     mask = (
         (pd.to_datetime(resolved, utc=True) <= as_of)
         & (pd.to_datetime(issued, utc=True) > as_of - window)
         & np.isfinite(z)
     )
-    values = np.asarray(z)[mask.to_numpy()]
-    if len(values) < min_count:
-        return {level: float("nan") for level in levels}
-    return {level: conformal_quantile(values, level) for level in levels}
+    result: BoolArray = mask.to_numpy()
+    return result
 
 
 def rolling_multipliers(
