@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { formatCountdown, parseIntervalToMs, cn } from "@/lib/utils";
 import { usePredictionStore } from "@/store/usePredictionStore";
+import { DIRECTION_MODEL_STATUS } from "@/lib/modelStatus";
 import { ConfidenceGauge } from "./ConfidenceGauge";
 import { Card } from "@/components/ui/Card";
 import { CardSkeleton } from "@/components/ui/Skeleton";
@@ -80,6 +81,14 @@ export function CurrentPredictionCard() {
         </div>
 
         <p className="text-xs text-gray-500">Modelo v{prediction.model_version}</p>
+
+        {(prediction.status ?? DIRECTION_MODEL_STATUS.status) === "experimental" && (
+          <p className="rounded border border-yellow-700/60 px-3 py-2 text-center text-xs text-yellow-300">
+            Experimental — no supera a reglas simples ({DIRECTION_MODEL_STATUS.baselineName}:{" "}
+            {(DIRECTION_MODEL_STATUS.baselineAccuracy * 100).toFixed(1)}% vs{" "}
+            {(DIRECTION_MODEL_STATUS.accuracy * 100).toFixed(1)}%).
+          </p>
+        )}
       </div>
     </Card>
   );

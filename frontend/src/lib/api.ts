@@ -85,6 +85,8 @@ export interface Prediction {
   actual_direction: Direction | null;
   is_correct: boolean | null;
   resolved_at: string | null;
+  /** Ausente hasta que el backend lo exponga (F4); la UI asume «experimental». */
+  status?: ModelStatus;
 }
 
 export interface MonthlyAccuracy {
@@ -98,8 +100,16 @@ export interface AccuracyMetrics {
   last_30d: number | null;
   last_7d: number | null;
   total_resolved: number;
+  /** Accuracy del mejor baseline en el mismo período; mostrar junto a `overall`. */
+  baseline_overall?: number | null;
   by_month: MonthlyAccuracy[];
 }
+
+/**
+ * "experimental": no supera a los baselines con significancia (gate de docs/research).
+ * "validated": superó el gate de desarrollo y un holdout independiente.
+ */
+export type ModelStatus = "experimental" | "validated";
 
 export interface ModelMetadata {
   version: number;
@@ -109,6 +119,10 @@ export interface ModelMetadata {
   val_precision: number | null;
   val_recall: number | null;
   baseline_accuracy: number | null;
+  best_baseline_accuracy?: number | null;
+  beats_baseline?: boolean;
+  status?: ModelStatus;
+  evidence_url?: string | null;
   trained_at: string;
   is_active: boolean;
   feature_names: string[];

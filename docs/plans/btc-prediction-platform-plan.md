@@ -425,10 +425,10 @@ matplotlib         # Calibration curves, visualización de métricas
 |--------|------|-------------|----------|
 | `GET` | `/api/v1/candles` | OHLCV paginado | `{ data: Candle[], pagination }` |
 | `GET` | `/api/v1/candles/latest` | Última vela + variación | `Candle` |
-| `GET` | `/api/v1/predictions/current` | Predicción activa | `{ direction, confidence, model_version, timestamp }` |
+| `GET` | `/api/v1/predictions/current` | Predicción activa | `{ direction, confidence, model_version, timestamp, status: "experimental" \| "validated" }` |
 | `GET` | `/api/v1/predictions/history` | Historial de predicciones | `{ data: Prediction[], pagination }` |
-| `GET` | `/api/v1/metrics/accuracy` | Accuracy histórico y por período | `{ overall, last_30d, last_7d, by_month[] }` |
-| `GET` | `/api/v1/metrics/model` | Metadata del modelo activo | `{ version, type, val_accuracy, trained_at }` |
+| `GET` | `/api/v1/metrics/accuracy` | Accuracy histórico y por período, siempre junto al baseline | `{ overall, baseline_overall, last_30d, last_7d, by_month[] }` |
+| `GET` | `/api/v1/metrics/model` | Metadata y estado de validación del modelo | `{ version, type, val_accuracy, best_baseline_accuracy, beats_baseline, status, evidence_url, trained_at }` |
 | `GET` | `/api/v1/features/latest` | Features actuales (transparencia) | `{ features: Record<string, number> }` |
 | `WS` | `/ws/live` | Stream de precio y predicciones | `{ type: "candle" \| "prediction", data }` |
 
@@ -489,9 +489,9 @@ def get_prediction_service() -> PredictionPort:
 | 5.2 | Layout principal | Grid responsive: Gráfico (8 cols), Panel lateral (4 cols). Header con logo + precio BTC live + variación 24h. |
 | 5.3 | Componente: Candlestick Chart | TradingView Lightweight Charts. Cargar OHLCV desde API. Configurar dark theme. Resize handler. |
 | 5.4 | Componente: Prediction Markers | Overlay de flechas/markers sobre el gráfico en los timestamps de cada predicción. Verde ↑ (UP), Rojo ↓ (DOWN). Opacidad proporcional a la confianza. |
-| 5.5 | Componente: Current Prediction Card | Card prominente con: dirección (UP/DOWN), confianza (%), countdown al próximo cierre de vela, semáforo visual (verde/amarillo/rojo según confianza). |
-| 5.6 | Componente: Confidence Gauge | Gauge semicircular o barra con gradiente. 50%=neutral, 60%+=verde, <50%=rojo. Animación suave. |
-| 5.7 | Componente: Historical Accuracy Panel | Accuracy overall, últimos 7d, 30d, 90d. Sparkline de accuracy rolling. Badge: "Modelo v3 — 57.2% accuracy". |
+| 5.5 | Componente: Current Prediction Card | Card con: dirección (UP/DOWN), probabilidad, countdown al próximo cierre de vela. Mientras `status = "experimental"`, mostrar la etiqueta **"Experimental — no supera a reglas simples"** y no usar semáforo verde/rojo (sugiere una ventaja inexistente). |
+| 5.6 | Componente: Confidence Gauge | Barra de probabilidad neutra (sin colores de compra/venta) mientras el modelo sea experimental; las probabilidades reales rara vez se alejan de 45–55%. |
+| 5.7 | Componente: Historical Accuracy Panel | Accuracy overall, últimos 7d, 30d, 90d, **siempre junto al mejor baseline** del mismo período y la diferencia. Sparkline de accuracy rolling contra baseline. Badge con el estado real: p. ej. "Experimental — 54.0% vs baseline 54.0%" (ver [docs/research](../research/README.md)). |
 | 5.8 | Componente: Prediction History Table | Tabla paginada con: timestamp, predicción, confianza, resultado real, ✅/❌. Filterable. |
 | 5.9 | Componente: Feature Importance Chart | Bar chart horizontal (Recharts) con top-10 features y su SHAP value promedio. Actualizable. |
 | 5.10 | WebSocket integration | Hook `useWebSocket` para recibir precio live y nuevas predicciones. Reconexión automática con backoff. |

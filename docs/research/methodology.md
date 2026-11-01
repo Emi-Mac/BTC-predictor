@@ -72,6 +72,17 @@ dirección) se informa en la Fase 0, pero es sistemáticamente peor (≈46%).
   accuracy frente al conjunto de referencia tiene límite inferior simultáneo > 0 en todas las
   comparaciones a la vez.
 
+## 5b. Estudios no direccionales
+
+- **Reglas de tendencia (E-11):** sin ajuste; se evalúan solo por economía en los 48 meses OOS
+  contra *buy & hold*, con White y bootstrap de la diferencia de Sharpe.
+- **Volatilidad (E-12):** objetivo = varianza realizada futura anualizada (retornos de 4h);
+  pérdida QLIKE `σ²/σ̂² − log(σ²/σ̂²) − 1`; pronóstico lognormal corregido
+  `exp(μ̂ + s²/2)`; mismos folds con purga por horizonte. La economía se compara también con
+  una **exposición constante igual a la media**, para separar el efecto de *timing* del de
+  invertir menos.
+- Todo análisis no preespecificado se marca como *post hoc* y no cuenta para ningún gate.
+
 ## 6. Registro y reproducibilidad
 
 - Cada ejecución escribe `report.json` y `predictions.parquet` en un directorio nuevo y añade
