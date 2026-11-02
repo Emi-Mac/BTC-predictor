@@ -300,5 +300,30 @@ retrospectivos, no prospectivos: sirven para desarrollo y **no** cuentan como ev
 herramienta rechaza cualquier base cuyo nombre no contenga «dev»). Para que la tarjeta «Predicción
 Actual» y el gráfico tengan datos, `up` también copia el modelo de dirección activo (`model_registry`)
 desde `btcpredictor` y reproduce sus predicciones con `backend/scripts/replay_predictions.py`
-(mismo criterio: solo bases «dev», retrospectivo). El stack de la Fase 4 sigue en
-los puertos 3000 y 8000 sin cambios; el 3100 y el 8001 son independientes.
+(mismo criterio: solo bases «dev», retrospectivo). El 3100 y el 8001 son independientes del
+stack en vivo (sección 9).
+
+## 9. Operación en vivo (datos reales, base `btcpredictor`)
+
+Desde 2026-11-02 el stack de los puertos 3000/8000 corre **esta rama** en modo producción; ya no
+corre el código de la Fase 4. La base `btcpredictor` está en Alembic 009.
+
+```bash
+infra/scripts/prod.sh up        # respaldo, migraciones, modelos, backend, worker y frontend
+infra/scripts/prod.sh status
+infra/scripts/prod.sh backup    # pg_dump a ~/btc-backups
+infra/scripts/prod.sh frontend  # recompila y reinicia solo el frontend (next build + next start)
+infra/scripts/prod.sh down      # detiene backend, worker y frontend (conserva la base)
+```
+
+- Usa `infra/docker-compose.yml` + `infra/docker-compose.prod.yml`: imágenes con el código copiado
+  (sin `--reload` ni montar `src`), usuario no-root y **un solo worker** de uvicorn (el scheduler
+  del backend vive en el proceso; con 2 workers duplicaría trabajos). Variables en `.env`:
+  `ENVIRONMENT=production`, `SECRET_KEY` propio, `VOLATILITY_ENABLED=true`,
+  `VOLATILITY_SOURCES_ENABLED=true`, `VOLATILITY_VALIDATION_STATUS=in_validation`.
+- No hay replay: los pronósticos y predicciones nacen del reloj real; el historial de volatilidad
+  se llena vela a vela y la calibración usa la semilla del modelo hasta que haya ≥ 1080 resueltos.
+- Tras cambiar código hay que reconstruir: `docker compose … build backend ml-worker` (o `prod.sh up`).
+- Revertir a la Fase 4 exigiría restaurar el respaldo previo a la migración
+  (`pg_restore` desde `~/btc-backups/`) y volver a `feature/fase4-desarrollo-API`.
+- La sombra prospectiva (`btc-shadow`, puerto 5433) es independiente y no se toca.

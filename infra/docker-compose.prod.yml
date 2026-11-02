@@ -1,0 +1,33 @@
+# Capa de producción sobre infra/docker-compose.yml (datos reales en vivo, base `btcpredictor`).
+# Diferencias frente a desarrollo: imágenes con el código copiado (sin montar ./src ni --reload),
+# usuario no-root, un solo worker de uvicorn (el scheduler del backend corre dentro del proceso:
+# con 2 workers duplicaría trabajos) y banderas de volatilidad activas.
+# Operación: infra/scripts/prod.sh
+services:
+  backend:
+    build:
+      target: production
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    volumes: !override
+      - ./ml/artifacts:/app/artifacts:ro
+
+  ml-worker:
+    volumes: !override
+      - ./ml/artifacts:/app/artifacts
+
+  # Migraciones de Alembic (el código del backend se monta: la imagen de producción solo trae src/).
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    image: btc-predictor-backend:dev
+    profiles:
+      - tools
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-btcuser}:${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-btcpredictor}
+    volumes:
+      - ./backend:/app
+    networks:
+      - btc_network

@@ -471,6 +471,8 @@ $RUN src.volatility.activation --version 3 --reason "..."    # activación expl�
 infra/scripts/shadow.sh up | status | report                 # sombra prospectiva (stack aislado)
 ```
 
+- **Operación en vivo (datos reales):** `infra/scripts/prod.sh up|status|backup|frontend|down`
+  (http://localhost:3000, API en http://localhost:8000; ver sección 9 del runbook).
 - **Levantar esta rama para desarrollo:** `infra/scripts/dev-volatility.sh up` (dashboard en
   http://localhost:3100, API en http://localhost:8001, base `btc_vol_dev` propia; no toca el stack
   de la Fase 4 ni la sombra).
