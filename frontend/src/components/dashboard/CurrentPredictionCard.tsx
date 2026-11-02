@@ -87,18 +87,29 @@ export function CurrentPredictionCard() {
         <p className="text-xs text-gray-500">Modelo v{prediction.model_version}</p>
 
         {(prediction.status ?? DIRECTION_MODEL_STATUS.status) === "experimental" && (
-          <p className="rounded border border-yellow-700/60 px-3 py-2 text-center text-xs text-yellow-300">
-            Experimental — no supera a reglas simples.{" "}
-            {accuracy?.overall != null && accuracy.baseline_overall != null
-              ? `Acierto histórico ${formatAccuracy(accuracy.overall)} frente a ${formatAccuracy(
-                  accuracy.baseline_overall,
-                )} de la regla «siempre la dirección más frecuente» (${accuracy.total_resolved} predicciones).`
-              : `En la investigación: ${(DIRECTION_MODEL_STATUS.accuracy * 100).toFixed(
-                  1,
-                )}% frente a ${(DIRECTION_MODEL_STATUS.baselineAccuracy * 100).toFixed(1)}% (${
-                  DIRECTION_MODEL_STATUS.baselineName
-                }).`}
-          </p>
+          <div className="flex flex-col gap-1 rounded border border-yellow-700/60 px-3 py-2 text-center text-xs text-yellow-300">
+            <p className="font-semibold">Experimental — no supera a reglas simples.</p>
+            <p className="text-yellow-300/80">
+              En la investigación: {(DIRECTION_MODEL_STATUS.accuracy * 100).toFixed(1)}% frente a{" "}
+              {(DIRECTION_MODEL_STATUS.baselineAccuracy * 100).toFixed(1)}% (
+              {DIRECTION_MODEL_STATUS.baselineName}).
+            </p>
+            {accuracy?.overall != null && accuracy.baseline_overall != null && (
+              <p className="text-yellow-300/80">
+                En vivo: {formatAccuracy(accuracy.overall)} frente a{" "}
+                {formatAccuracy(accuracy.baseline_overall)} de la regla «siempre la dirección más
+                frecuente» ({accuracy.total_resolved} predicciones, margen de error ±
+                {(
+                  1.96 *
+                  Math.sqrt(
+                    (accuracy.overall * (1 - accuracy.overall)) / Math.max(accuracy.total_resolved, 1),
+                  ) *
+                  100
+                ).toFixed(1)}{" "}
+                pp: no concluyente).
+              </p>
+            )}
+          </div>
         )}
       </div>
     </Card>

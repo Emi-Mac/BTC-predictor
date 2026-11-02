@@ -37,6 +37,8 @@ services:
       MODEL_ARTIFACT_DIR: /app/artifacts
     volumes:
       - ./backend/src:/app/src
+      - ./backend/scripts:/app/scripts:ro
+      - ./ml/artifacts:/app/artifacts:ro
     ports:
       - "${DEV_API_PORT:-8001}:8000"
     depends_on:

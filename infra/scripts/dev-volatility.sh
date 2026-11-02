@@ -40,6 +40,20 @@ ensure_database() {
 
 frontend_pid() { lsof -ti "tcp:$WEB_PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true; }
 
+# El modelo direccional activo se copia de la base principal (mismos artefactos ONNX, montados
+# en solo lectura); así la tarjeta «Predicción actual» y el gráfico funcionan como en el stack
+# principal. Solo se copia si la base de desarrollo aún no tiene modelos.
+sync_direction_model() {
+  local src_db="${DEV_SOURCE_DB:-btcpredictor}"
+  if [[ "$(psql_dev "select count(*) from model_registry")" != "0" ]]; then return; fi
+  if [[ "$(docker exec "$PG" psql -U "$DEV_POSTGRES_USER" -d "$src_db" -tA -c "select count(*) from model_registry where is_active" 2>/dev/null || echo 0)" == "0" ]]; then
+    echo "▶ (No hay modelo direccional activo en $src_db; la tarjeta de dirección quedará vacía.)"; return
+  fi
+  echo "▶ Copiando el modelo direccional activo desde ${src_db}…"
+  docker exec "$PG" psql -U "$DEV_POSTGRES_USER" -d "$src_db" -c "\copy (select * from model_registry where is_active) to stdout" \
+    | docker exec -i "$PG" psql -U "$DEV_POSTGRES_USER" -d "$DB" -c "\copy model_registry from stdin" >/dev/null
+}
+
 start_frontend() {
   if [[ -n "$(frontend_pid)" ]]; then echo "▶ Frontend ya en marcha en el puerto $WEB_PORT."; return; fi
   echo "▶ Levantando el frontend en http://localhost:${WEB_PORT} (log: ${LOGFILE})…"
@@ -71,8 +85,15 @@ cmd_up() {
     echo "▶ Reproduciendo $REPLAY_CANDLES velas de pronósticos para poblar historial y calibración…"
     tools python -m src.volatility.replay --candles "$REPLAY_CANDLES"
   fi
+  sync_direction_model
   echo "▶ Levantando el backend en http://localhost:$API_PORT …"
   "${COMPOSE[@]}" up -d backend
+  if [[ "$(psql_dev "select count(*) from model_registry where is_active")" != "0" \
+     && "$(psql_dev "select count(*) from predictions_log")" -lt 50 ]]; then
+    echo "▶ Reproduciendo predicciones direccionales de las últimas $REPLAY_CANDLES velas…"
+    sleep 8
+    docker exec btc_dev_backend python /app/scripts/replay_predictions.py --candles "$REPLAY_CANDLES"
+  fi
   start_frontend
   echo; echo "Listo → http://localhost:$WEB_PORT  (API: http://localhost:$API_PORT/docs)"
 }

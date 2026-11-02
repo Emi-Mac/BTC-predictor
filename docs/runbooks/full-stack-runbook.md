@@ -297,5 +297,8 @@ infra/scripts/dev-volatility.sh reset    # borra la base de desarrollo
 congelado, deja que el worker haga el backfill y **reproduce** 330 velas de pronósticos
 (`python -m src.volatility.replay`) para poblar historial y calibración. Esos pronósticos son
 retrospectivos, no prospectivos: sirven para desarrollo y **no** cuentan como evidencia (la
-herramienta rechaza cualquier base cuyo nombre no contenga «dev»). El stack de la Fase 4 sigue en
+herramienta rechaza cualquier base cuyo nombre no contenga «dev»). Para que la tarjeta «Predicción
+Actual» y el gráfico tengan datos, `up` también copia el modelo de dirección activo (`model_registry`)
+desde `btcpredictor` y reproduce sus predicciones con `backend/scripts/replay_predictions.py`
+(mismo criterio: solo bases «dev», retrospectivo). El stack de la Fase 4 sigue en
 los puertos 3000 y 8000 sin cambios; el 3100 y el 8001 son independientes.
