@@ -5,7 +5,7 @@
 > de volatilidad validado**: volatilidad esperada, rango de precio probable, régimen de riesgo
 > y una calculadora de tamaño de posición. Todo con la misma API (FastAPI) y el mismo dashboard
 > (Next.js).
-> **Estado:** F0–F5 implementadas; F6 preparada (infraestructura y evaluador listos, reloj sin iniciar); F7 pendiente.
+> **Estado:** F0–F5 implementadas; F6 en curso (sombra iniciada el 2026-11-02; ventana del 2026-11-03 al 2027-01-26 UTC, commit `b3da2e1`); F7 pendiente.
 
 ## 1. Punto de partida (evidencia)
 
@@ -243,7 +243,7 @@ resultados.
 | F3 ✅ | Inferencia y resolución en el ML worker (009) | 1–2 d | Pronósticos idempotentes cada 4h; resolución correcta en test (probado también de extremo a extremo con datos reales en una base temporal) |
 | F4 ✅ | Backend: dominio, repositorio, servicios, endpoints, WS, pruebas | 2–3 d | Cobertura ≥ 80% (96%); contratos documentados en `/docs` |
 | F5 ✅ | Frontend: panel de riesgo, bandas, historial, calibración, calculadora | 3–4 d | tsc, lint y build en verde; verificación en el navegador (hecha con datos reales) |
-| F6 🟡 | Sombra prospectiva (12 semanas de calendario) | Bajo | Criterio 4 de la sección 9 (stack `infra/docker-compose.shadow.yml`, `shadow.sh` y `src.volatility.shadow` listos y probados; falta iniciar y esperar 12 semanas) |
+| F6 ⏳ | Sombra prospectiva (12 semanas de calendario) | Bajo | Criterio 4 de la sección 9 (stack `infra/docker-compose.shadow.yml`, `shadow.sh` y `src.volatility.shadow` listos y probados; en ejecución desde 2026-11-02: falta esperar 12 semanas y evaluar con `shadow.sh report`) |
 | F7 | Documentación: runbook, `docs/trading`, registro E-13 | 1 d | Documentos actualizados con cifras reales de producción |
 
 Total de esfuerzo: ≈ 14–18 días de desarrollo más 12 semanas de observación.
