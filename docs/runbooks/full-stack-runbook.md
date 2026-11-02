@@ -273,3 +273,29 @@ Hasta cumplir las 12 semanas el informe es provisional (`in_progress`; `interim`
 
 Este mismo stack sirve para la observación de 48 h de F1 (datos en vivo ≤ 3 h): `shadow.sh status`
 ejecuta `ingestion.run check`, que incluye DVOL, OI y calendario FOMC.
+
+### Entorno de desarrollo de esta rama (volatilidad)
+
+Para ver el panel de riesgo completo (con historial y calibración) sin tocar el stack de la Fase 4
+ni la base de la sombra:
+
+```bash
+infra/scripts/dev-volatility.sh up       # ~4 min la primera vez
+infra/scripts/dev-volatility.sh status
+infra/scripts/dev-volatility.sh down     # detiene todo (conserva la base)
+infra/scripts/dev-volatility.sh reset    # borra la base de desarrollo
+```
+
+| Pieza | Dónde |
+|---|---|
+| Dashboard de esta rama | http://localhost:3100 |
+| API (volatilidad habilitada) y `/docs` | http://localhost:8001 |
+| Base | `btc_vol_dev` dentro de `btc_postgres` (separada de `btcpredictor` y de la sombra) |
+| ML worker | `btc_dev_worker` (código montado; `VOLATILITY_SOURCES_ENABLED=true`, 200 días de historia) |
+
+`up` crea la base, aplica las migraciones 001–009, entrena y activa los modelos con el dataset
+congelado, deja que el worker haga el backfill y **reproduce** 330 velas de pronósticos
+(`python -m src.volatility.replay`) para poblar historial y calibración. Esos pronósticos son
+retrospectivos, no prospectivos: sirven para desarrollo y **no** cuentan como evidencia (la
+herramienta rechaza cualquier base cuyo nombre no contenga «dev»). El stack de la Fase 4 sigue en
+los puertos 3000 y 8000 sin cambios; el 3100 y el 8001 son independientes.

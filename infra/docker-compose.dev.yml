@@ -1,0 +1,85 @@
+# Entorno de desarrollo de la rama feature/prediccion-volatilidad (backend + ML worker + base propia).
+#
+# Usa una base `btc_vol_dev` dentro del PostgreSQL que ya corre (btc_postgres): no toca la base del
+# stack de la Fase 4 ni la de la sombra. El código se MONTA (hot-reload), a diferencia de la sombra.
+# Operación: infra/scripts/dev-volatility.sh
+name: btc-dev
+
+services:
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    image: btc-predictor-backend:dev
+    container_name: btc_dev_migrate
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: &database_url postgresql+asyncpg://${DEV_POSTGRES_USER:-btcuser}:${DEV_POSTGRES_PASSWORD:?lo define dev-volatility.sh}@postgres:5432/${DEV_POSTGRES_DB:-btc_vol_dev}
+    volumes:
+      - ./backend:/app
+    networks:
+      - btc_network
+
+  backend:
+    image: btc-predictor-backend:dev
+    container_name: btc_dev_backend
+    restart: unless-stopped
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      DATABASE_URL: *database_url
+      ENVIRONMENT: development
+      BACKEND_AUTO_CREATE_SCHEMA: "false"
+      VOLATILITY_ENABLED: "true"
+      VOLATILITY_VALIDATION_STATUS: in_validation
+      CORS_ORIGINS: ${DEV_CORS_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100}
+      MODEL_ARTIFACT_DIR: /app/artifacts
+    volumes:
+      - ./backend/src:/app/src
+    ports:
+      - "${DEV_API_PORT:-8001}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - btc_network
+
+  ml-worker:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    image: btc-predictor-ml-worker:dev
+    container_name: btc_dev_worker
+    restart: unless-stopped
+    environment: &ml_environment
+      DATABASE_URL: *database_url
+      VOLATILITY_SOURCES_ENABLED: "true"
+      HISTORY_DAYS: ${DEV_HISTORY_DAYS:-200}
+      MODEL_ARTIFACT_DIR: /app/artifacts
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./ml/src:/app/src
+      - ./ml/artifacts:/app/artifacts
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - btc_network
+
+  # Comandos puntuales (entrenar, activar, reproducir historial).
+  ml-tools:
+    image: btc-predictor-ml-worker:dev
+    profiles:
+      - tools
+    environment: *ml_environment
+    volumes:
+      - ./ml/src:/app/src
+      - ./ml/artifacts:/app/artifacts
+    networks:
+      - btc_network
+
+networks:
+  btc_network:
+    external: true
+    name: btc-predictor_btc_network

@@ -471,6 +471,9 @@ $RUN src.volatility.activation --version 3 --reason "..."    # activación expl�
 infra/scripts/shadow.sh up | status | report                 # sombra prospectiva (stack aislado)
 ```
 
+- **Levantar esta rama para desarrollo:** `infra/scripts/dev-volatility.sh up` (dashboard en
+  http://localhost:3100, API en http://localhost:8001, base `btc_vol_dev` propia; no toca el stack
+  de la Fase 4 ni la sombra).
 - [volatility-integration-plan.md](./docs/plans/volatility-integration-plan.md): plan, decisiones
   y estado por fase (F0–F5 implementadas, F6 en curso, F7 documentación).
 - [full-stack-runbook.md](./docs/runbooks/full-stack-runbook.md) (secciones 8 en adelante):

@@ -504,3 +504,39 @@ async def _closes(engine):
     async with engine.connect() as conn:
         rows = (await conn.execute(sa.text("select open_time, close from ohlcv_candles"))).all()
     return {pd.Timestamp(t): float(c) for t, c in rows}
+
+
+async def test_replay_rebuilds_history_only_on_development_databases(
+    engine, settings, live, development, tmp_path
+):
+    from src.volatility import replay
+
+    for name in ("btcshadow", "btcpredictor", "btcpredictor_test", "", None):
+        with pytest.raises(ValueError, match="desarrollo"):
+            replay.assert_development_database(name)
+    replay.assert_development_database("btc_vol_dev")
+
+    await activate_models(engine, development, tmp_path)
+    await seed_market(engine, settings)
+    with pytest.raises(ValueError, match="desarrollo"):  # la base de pruebas no se llama «dev»
+        await replay.replay(engine, settings, live, candles=3)
+    with pytest.raises(ValueError, match="positivo"):
+        await replay.replay(engine, settings, live, candles=0, enforce_dev_database=False)
+
+    result = await replay.replay(
+        engine, settings, live, candles=3, resolve_at=NOW, enforce_dev_database=False
+    )
+    assert result["candles"] == 3 and result["created"] == 6
+    rows = await forecasts(engine)
+    opened = sorted({LAST_OPEN - i * STEP for i in (1, 2, 3)})
+    async with engine.connect() as conn:
+        times = (
+            await conn.execute(
+                sa.text(
+                    "select distinct c.open_time from volatility_forecasts f "
+                    "join ohlcv_candles c on c.id = f.candle_id order by 1"
+                )
+            )
+        ).scalars().all()
+    assert [pd.Timestamp(t) for t in times] == opened  # la última vela queda para el worker
+    assert len(rows) == 6 and all(r["resolved_at"] is None for r in rows)
