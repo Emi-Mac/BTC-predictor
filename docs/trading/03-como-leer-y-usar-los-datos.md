@@ -13,9 +13,9 @@
 
 ## 3.2 Paneles del dashboard
 
-> El dashboard y la API descritos aquí están en la rama `feature/fase4-desarrollo-API` (ver su
-> `docs/runbooks/full-stack-runbook.md` para levantarlos). Llegarán a esta rama con la fase F0
-> del [plan de integración](../plans/volatility-integration-plan.md).
+> El dashboard y la API descritos aquí están integrados en esta rama (ver
+> `docs/runbooks/full-stack-runbook.md` para levantarlos). El panel de riesgo requiere el
+> backend con `VOLATILITY_ENABLED=true`; si no, se reduce a un aviso.
 
 | Panel | Qué muestra | Cómo usarlo | Error común |
 |---|---|---|---|
@@ -26,15 +26,20 @@
 | Features actuales | Valores de entrada del modelo | Transparencia y depuración | Usarlas como indicadores de trading por separado |
 | Historial | Tabla de predicciones con resultado real | Calcular tu propio acierto por periodo | Ignorar las rachas: 5 fallos seguidos son normales con 54% |
 
-**Panel de riesgo (tras la integración planificada):**
+**Panel de riesgo** (sección inferior del dashboard; etiqueta «En validación» hasta cerrar la
+sombra prospectiva):
 
 | Panel | Qué muestra | Cómo usarlo |
 |---|---|---|
-| Volatilidad esperada | Volatilidad anual y su equivalente diario y semanal; régimen | Ajustar tamaño de posición y distancia de stops |
-| Rango probable | Bandas del 68/90/95% a 1 y 7 días | Poner stops fuera de la banda del 68% del horizonte de tu operación |
-| Pronóstico vs realizado | Historial del error del pronóstico | Confiar más o menos en el pronóstico según su desempeño reciente |
-| Calibración | Porcentaje real de veces que el precio quedó dentro de cada banda | Si la banda del 68% contiene el precio mucho menos del 68%, amplía los stops |
-| Calculadora | Tamaño de posición según capital, riesgo y stop | Ver [documento 5](./05-ordenes-y-tamano-de-posicion.md) |
+| Volatilidad esperada | Volatilidad anual y su equivalente diario y semanal; régimen; DVOL y volatilidad realizada como referencia | Ajustar tamaño de posición y distancia de stops |
+| Rango probable (y líneas en el gráfico) | Bandas del 68/90/95% a 1 y 7 días; en el gráfico, 68% y 95% a 7 días desde la última vela | Poner stops fuera de la banda del 68% del horizonte de tu operación |
+| Pronosticada vs realizada | Volatilidad pronosticada a 7 días frente a la que ocurrió después | Confiar más o menos en el pronóstico según su desempeño reciente |
+| Calibración | Cobertura real de cada banda frente a su nivel nominal (histórica y últimas 12 semanas), QLIKE frente al ingenuo | Si la cobertura se desvía más de 5 pp (alerta ámbar), tómalas con cautela y amplía los stops |
+| Calculadora | Tamaño de posición según capital, riesgo (0.25–2%) y stop (k·σ) | Ver [documento 5](./05-ordenes-y-tamano-de-posicion.md) |
+
+Si el panel avisa de **pronóstico de respaldo**, faltaba una fuente (DVOL, funding, etc.) y se usó
+un modelo más simple; trátalo con más cautela. Ningún elemento del panel es una señal de compra
+o venta, y por eso no usa los colores verde y rojo.
 
 ## 3.3 Cómo interpretar la predicción direccional
 
@@ -70,24 +75,29 @@ límite inferior = P × exp(−k × σ(horizonte))
 límite superior = P × exp(+k × σ(horizonte))
 ```
 
-Usa los multiplicadores **empíricos** de BTC (medidos sobre 8,766 pronósticos de 2022–2026; son
-descriptivos hasta completar la validación prospectiva), no los de una distribución normal:
+Usa los multiplicadores **conformes** de BTC (cuantiles de los resultados reales ya resueltos,
+en ventana móvil de 2 años; E-12b), no los de una distribución normal. El dashboard los calcula
+en vivo y los recalcula con cada pronóstico; la tabla muestra su valor medio fuera de muestra:
 
-| Cobertura deseada | k gaussiano | k empírico (HAR-X, 7d) |
-|---|---|---|
-| 68% | 1.00 | 0.86 |
-| 90% | 1.645 | 1.77 |
-| 95% | 1.96 | 2.52 |
+| Cobertura deseada | k gaussiano | k conforme 1 día | k conforme 7 días |
+|---|---|---|---|
+| 68% | 1.00 | 0.87 | 0.87 |
+| 90% | 1.645 | 1.85 | 1.87 |
+| 95% | 1.96 | 2.50 | 2.68 |
 
 El 95% empírico es mucho más ancho que el gaussiano: BTC tiene **colas gruesas** (movimientos
 extremos más frecuentes de lo que predice la campana de Gauss).
 
-**Ejemplo completo** (precio 77,582 USD, σ anual 44.4%):
+**Ejemplo completo** (precio 77,582 USD, σ anual 44.4%, multiplicadores de la tabla):
 
 | Horizonte | 68% | 90% | 95% |
 |---|---|---|---|
-| 1 día | 76,047 – 79,148 | 74,455 – 80,840 | 73,169 – 82,261 |
-| 7 días | 73,586 – 81,795 | 69,582 – 86,502 | 66,446 – 90,585 |
+| 1 día | 76,029 – 79,167 | 74,317 – 80,990 | 73,203 – 82,223 |
+| 7 días | 73,541 – 81,845 | 69,155 – 87,036 | 65,795 – 91,480 |
+
+Cobertura fuera de muestra (desde 2023-03, conforme): a 7 días 68.4% / 91.1% / 96.0%; a 1 día
+67.5% / 91.1% / 96.0% (a 1 día las bandas de 90% y 95% son ligeramente conservadoras: cubren
+~1 pp de más).
 
 ## 3.5 Datos históricos útiles para calibrar expectativas
 
@@ -116,8 +126,15 @@ La API está en `http://localhost:8000` (documentación interactiva en `/docs`).
 | `GET /api/v1/metrics/accuracy` | Acierto agregado y por mes |
 | `GET /api/v1/metrics/model` | Modelo activo y sus métricas de validación |
 | `GET /api/v1/features/latest` | Features de la última vela |
-| `GET /api/v1/volatility/current?horizon=7d` | *(planificado)* Volatilidad, régimen y bandas |
-| `GET /api/v1/risk/position-size?...` | *(planificado)* Calculadora de tamaño |
+| `GET /api/v1/volatility/current?horizon=1d\|7d` | Volatilidad, régimen, bandas 68/90/95% (`null` sin calibración suficiente), DVOL, realizada 7d/30d, modelo y motivo de respaldo, `validation_status` |
+| `GET /api/v1/volatility/history?horizon=&limit=&offset=` | Pronóstico frente a realizado por vela |
+| `GET /api/v1/metrics/volatility?horizon=` | Cobertura real, QLIKE (y del ingenuo), pendiente de Mincer-Zarnowitz y últimas 12 semanas |
+| `GET /api/v1/risk/position-size?capital=&risk_pct=&stop_k=&horizon=&side=` | Calculadora de tamaño (rechaza riesgo > 5% y valores no positivos) |
+| WebSocket `/ws/live` | Mensaje `volatility` con cada pronóstico nuevo |
+
+Los endpoints de volatilidad responden 404 si el backend tiene `VOLATILITY_ENABLED=false` o aún
+no hay pronósticos. `/metrics/model` y `/predictions/*` incluyen `status` («experimental»),
+`beats_baseline` y la comparación contra la regla trivial.
 
 Ejemplo en Python para medir tu propio acierto por mes:
 

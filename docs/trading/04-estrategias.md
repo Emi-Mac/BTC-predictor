@@ -83,19 +83,21 @@ decide **cuánto** y **dónde salir si te equivocas**.
 
 **Reglas:**
 1. Define el horizonte de la operación (1 día o 7 días).
-2. Stop: fuera de la banda del 68% de ese horizonte, idealmente entre 1× y 1.77× σ del
+2. Stop: fuera de la banda del 68% de ese horizonte, idealmente entre 1× y 1.87× σ del
    horizonte (ver documento 5).
 3. Tamaño: riesgo de 0.5–1% del capital total si el stop se ejecuta.
 4. Objetivo: al menos 1.5–2 veces la distancia del stop (relación beneficio/riesgo ≥ 1.5).
 5. Si la operación no avanza dentro del horizonte, ciérrala: tu tesis tenía un plazo.
 
-**Evidencia:** el cálculo de tamaño y stop está respaldado por la calibración de las bandas.
+**Evidencia:** el cálculo de tamaño y stop está respaldado por la calibración de las bandas
+(E-12b: cobertura nominal fuera de muestra a 7 días; la sombra prospectiva sigue en curso). Los
+tamaños los calcula la calculadora del dashboard.
 La ventaja de la dirección depende de **tu** tesis y no está probada.
 
 ## E. Reducción de riesgo por régimen y eventos ⚪
 
 **Reglas sugeridas:**
-- Régimen **extremo** (> 59.5% anual): no abrir posiciones nuevas o hacerlo a la mitad del
+- Régimen **extremo** (> 59.3% anual): no abrir posiciones nuevas o hacerlo a la mitad del
   tamaño normal.
 - **72 horas antes y después de una decisión del FOMC:** evitar entradas nuevas o reducir
   tamaño; ampliar stops a la banda del 90%.

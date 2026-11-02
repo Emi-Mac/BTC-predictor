@@ -450,67 +450,36 @@ El historial completo de experimentos, la metodología, las fuentes y el catálo
 están en [docs/research](./docs/research/README.md). Consúltalo antes de proponer un
 experimento nuevo.
 
-#### Integración de la volatilidad y uso en trading real
+#### Pronóstico de volatilidad en producción (rama `feature/prediccion-volatilidad`)
 
-- [volatility-integration-plan.md](./docs/plans/volatility-integration-plan.md): plan para llevar
-  el pronóstico de volatilidad al backend y al dashboard (ramas, modelo de datos, endpoints,
-  componentes, validación y fases).
+La volatilidad (a diferencia de la dirección) sí es predecible, y esta rama la lleva a
+producción: ingesta en vivo de DVOL, interés abierto y calendario FOMC (migración 007), modelos
+`har_x_live`/`har` registrados y activados de forma explícita (008), pronósticos con bandas
+calibradas de forma conforme y su resolución en el ML worker (009), API
+(`/api/v1/volatility/*`, `/metrics/volatility`, `/risk/position-size`, mensaje WS `volatility`)
+y un panel de riesgo en el dashboard con calculadora de tamaño de posición. Todo está apagado por
+defecto (`VOLATILITY_SOURCES_ENABLED`, `VOLATILITY_ENABLED`) y se muestra «en validación» hasta
+cerrar la sombra prospectiva de 12 semanas.
+
+```bash
+RUN="docker run --rm -v $PWD/ml/artifacts:/app/artifacts -w /app -e PYTHONPATH=/app \
+  -e MODEL_ARTIFACT_DIR=/app/artifacts -e DATABASE_URL=...  btc-predictor-ml-worker:latest python -m"
+$RUN src.volatility.study --dataset "$DATASET" --aux "$AUX" --development-end 2026-10-01T00:00:00Z  # E-12b
+$RUN src.volatility.train --horizon 42 --register --dataset "$DATASET" --aux "$AUX" \
+  --development-end 2026-10-01T00:00:00Z                     # modelos inactivos (1d: --horizon 6)
+$RUN src.volatility.activation --version 3 --reason "..."    # activación explícita
+infra/scripts/shadow.sh up | status | report                 # sombra prospectiva (stack aislado)
+```
+
+- [volatility-integration-plan.md](./docs/plans/volatility-integration-plan.md): plan, decisiones
+  y estado por fase (F0–F5 implementadas, F6 en curso, F7 documentación).
+- [full-stack-runbook.md](./docs/runbooks/full-stack-runbook.md) (secciones 8 en adelante):
+  fuentes, API, modelos, inferencia y sombra; [frontend-runbook.md](./docs/runbooks/frontend-runbook.md):
+  panel de riesgo.
 - [docs/trading](./docs/trading/README.md): guía educativa para usar el proyecto en la vida real
   (qué ofrece, viabilidad con costos, lectura de datos, estrategias, órdenes y tamaño de
   posición, gestión de riesgo, plan operativo y automatización segura). **No es asesoría
   financiera.**
-
-### 4. Desarrollar el frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:3000
-```
-
-> Runbook detallado (variables de entorno, troubleshooting de registry/CORS/WebSocket):
-> [`docs/runbooks/frontend-runbook.md`](./docs/runbooks/frontend-runbook.md)
-
-### 5. Instalar pre-commit hooks
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
----
-
-## Estructura del Proyecto
-
-```
-btc-predictor/
-├── ml/                    # Pipeline de Machine Learning
-│   ├── src/
-│   │   ├── ingestion/     # Conectores a APIs externas
-│   │   ├── features/      # Feature engineering
-│   │   ├── training/      # Walk-Forward training loop
-│   │   ├── evaluation/    # Métricas y comparación vs baseline
-│   │   └── export/        # Exportación ONNX
-│   └── notebooks/         # EDA y prototipado
-├── backend/               # API FastAPI (Arquitectura Hexagonal)
-│   ├── src/
-│   │   ├── domain/        # Entidades y puertos (interfaces)
-│   │   ├── application/   # Casos de uso / servicios
-│   │   ├── adapters/      # Implementaciones concretas
-│   │   └── config/        # Settings, DB, DI
-│   └── migrations/        # Alembic migrations
-├── frontend/              # Next.js + Tailwind CSS
-│   └── src/
-│       ├── app/           # Next.js App Router
-│       ├── components/    # Componentes UI
-│       ├── hooks/         # Custom hooks
-│       └── lib/           # API client, utilidades
-├── infra/                 # Docker Compose y scripts
-└── .env.example           # Template de variables de entorno
-```
-
----
 
 ## Plan de Fases
 
@@ -521,7 +490,7 @@ btc-predictor/
 | 2 — Features | Indicadores técnicos y macroeconómicos | ✅ Completada |
 | 3 — Modelado | Walk-Forward, XGBoost, LSTM, ONNX | 🟡 Implementada; rendimiento pendiente |
 | 4 — API | FastAPI hexagonal + endpoints REST | ✅ Completada (80 tests, 88,5% coverage); benchmark de latencia de inferencia pendiente |
-| 5 — Frontend | Dashboard dark-mode + TradingView | 🔲 Pendiente |
+| 5 — Frontend | Dashboard dark-mode + TradingView + panel de riesgo | 🟡 Implementado (rama de volatilidad); pruebas E2E pendientes |
 | 6 — Integración | E2E tests, hardening, model drift | 🔲 Pendiente |
 
 ---

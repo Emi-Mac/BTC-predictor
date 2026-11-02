@@ -81,6 +81,16 @@ dirección) se informa en la Fase 0, pero es sistemáticamente peor (≈46%).
   `exp(μ̂ + s²/2)`; mismos folds con purga por horizonte. La economía se compara también con
   una **exposición constante igual a la media**, para separar el efecto de *timing* del de
   invertir menos.
+- **Volatilidad en producción (E-12b):** `har_x_live` (HAR-X sin OI) se ajusta y se evalúa con
+  el mismo código que sirve en producción (`ml/src/volatility`), con las mismas reglas de
+  disponibilidad; la paridad se mide sobre todo el historial y sobre ventanas finales.
+  Las bandas usan `z = |log(P[t+h]/P[t])|/σ̂_h` y su cuantil **conforme** (⌈(n+1)q⌉-ésimo) entre
+  pronósticos ya resueltos (`t' + h ≤ t`) de los últimos 2 años, con al menos 1,080; la
+  cobertura se evalúa solo donde existen multiplicadores, con IC por bloques de 180 velas.
+- **Sombra prospectiva:** protocolo congelado en un manifiesto (criterios, modelos con SHA-256 y
+  commit). 1 día: una observación diaria (vela de 00:00 UTC) con IC binomial exacto; 7 días:
+  semanal, solo monitoreo hasta 26 semanas; rezago de ingesta ≤ 6 h; respaldo < 5%; modelos
+  congelados. Con 84 observaciones el IC es de ±10 pp (prueba de cordura).
 - Todo análisis no preespecificado se marca como *post hoc* y no cuenta para ningún gate.
 
 ## 6. Registro y reproducibilidad

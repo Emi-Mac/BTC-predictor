@@ -7,22 +7,28 @@
 - **Qué es:** la volatilidad anualizada esperada para el próximo día y la próxima semana.
   Ejemplo: 44% anual equivale a un movimiento típico de ±2.3% en un día y ±6.2% en una semana.
 - **Qué tan confiable es:** es la única señal del proyecto que supera a sus alternativas con
-  significancia estadística. HAR-X redujo el error del pronóstico semanal (QLIKE) de 0.419
-  (suponer que la próxima semana se parecerá a la anterior) a 0.237, con un intervalo de
-  confianza que excluye el cero.
+  significancia estadística. El modelo en producción (HAR-X-live, sin interés abierto) redujo el
+  error del pronóstico semanal (QLIKE) de 0.419 (suponer que la próxima semana se parecerá a la
+  anterior) a 0.236, y mejora al modelo base HAR con un intervalo de confianza que excluye el
+  cero (E-12b). **A 1 día** también supera al ingenuo, pero no se demostró ventaja sobre el
+  modelo base HAR. En vivo sigue **en validación** (sombra prospectiva de 12 semanas).
 - **Para qué sirve:** decidir **cuánto** comprar, **dónde** poner el stop y **cuándo** reducir
   la exposición. No dice si el precio subirá o bajará.
 
 ### 1.2 Rango probable de precio
 
 - **Qué es:** el intervalo donde, históricamente, cae el precio en el 68%, 90% o 95% de los
-  casos. Con BTC en 77,582 USD y 44.4% de volatilidad anual, el rango a 7 días era:
+  casos, con multiplicadores calibrados de forma conforme sobre resultados reales (no una
+  campana de Gauss). Con BTC en 77,582 USD y 44.4% de volatilidad anual, el rango a 7 días era:
 
   | Probabilidad histórica | Rango | Distancia |
   |---|---|---|
-  | 68% | 73,586 – 81,795 | ±5.3% |
-  | 90% | 69,582 – 86,502 | ±10.9% |
-  | 95% | 66,446 – 90,585 | ±15.5% |
+  | 68% | 73,541 – 81,845 | ±5.3% |
+  | 90% | 69,155 – 87,036 | ±11.5% |
+  | 95% | 65,795 – 91,480 | ±16.5% |
+
+  Fuera de muestra (desde 2023-03) a 7 días cubrieron 68.4%, 91.1% y 96.0%; con multiplicadores
+  gaussianos la banda «del 95%» habría cubierto solo 92.2% (E-12b).
 
 - **Advertencia:** «95%» significa que **1 de cada 20 semanas** el precio cierra fuera del
   rango. Los movimientos extremos ocurren: en 2022–2026, la peor semana fue −30.4% y la mejor
@@ -34,10 +40,13 @@ Clasifica el momento según el percentil histórico de la volatilidad pronostica
 
 | Régimen | Volatilidad anual | Qué implica |
 |---|---|---|
-| Bajo | < 38.6% | Movimientos pequeños; stops más cercanos, posiciones algo mayores |
-| Normal | 38.6–51.0% | Situación habitual |
-| Alto | 51.0–59.5% | Reducir tamaño; ampliar stops |
-| Extremo | > 59.5% | Ocurre el 10% del tiempo; posiciones pequeñas o fuera del mercado |
+| Bajo | < 38.7% | Movimientos pequeños; stops más cercanos, posiciones algo mayores |
+| Normal | 38.7–51.0% | Situación habitual |
+| Alto | 51.0–59.3% | Reducir tamaño; ampliar stops |
+| Extremo | > 59.3% | Ocurre el 10% del tiempo; posiciones pequeñas o fuera del mercado |
+
+Los umbrales se guardan con cada modelo y se recalculan al reentrenar; los de arriba son los del
+modelo a 7 días entrenado con datos hasta 2026-10-01.
 
 ### 1.4 Datos y transparencia
 
@@ -48,7 +57,7 @@ Clasifica el momento según el percentil histórico de la volatilidad pronostica
 
 ### 1.5 Evidencia documentada de qué funciona y qué no
 
-Los 12 experimentos de [docs/research](../research/experiment-log.md) te ahorran probar ideas
+Los 13 experimentos (E-01 a E-12b) de [docs/research](../research/experiment-log.md) te ahorran probar ideas
 que ya fallaron: más indicadores técnicos, on-chain, opciones, horizontes más largos, modelos
 más complejos.
 

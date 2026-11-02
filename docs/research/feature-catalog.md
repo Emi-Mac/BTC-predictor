@@ -82,6 +82,12 @@ log-loss **y** accuracy.
 la volatilidad a 7 días frente a HAR (QLIKE −0.025, IC > 0). Las features que no anticipan la
 dirección sí informan sobre el riesgo.
 
+**Entradas de `har_x_live` en producción (E-12b):** HAR (`log_var_1d/7d/30d`) más `log_dvol_var`,
+`log_vix`, `funding_sum_7d`, `drawdown_90d`, `abs_return_1d`, `volume_sma_ratio` y
+`fomc_next_72h`; **sin** `oi_change_7d`. Se arman con `live_inputs`
+([features.py](../../ml/src/volatility/features.py)), que reutiliza las funciones de
+`features.long_horizon`; cualquier entrada ausente o vencida activa el respaldo HAR.
+
 **Estabilidad de coeficientes (área D):** con todas las familias, los coeficientes de mayor
 magnitud conservan el signo en los 48 folds. A 3d destacan el percentil anual de volatilidad
 (+), la volatilidad de 30 días (−), el retorno de 90 días (+), el drawdown de 90 días (−), el

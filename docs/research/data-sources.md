@@ -16,6 +16,24 @@ Ubicación: `ml/artifacts/datasets/btcusdt-20200901-20261001-v1/`, verificable c
 | Binance funding BTCUSDT | Tasa cada 8h | Una vela de 4h tras la liquidación; antigüedad ≤ 36h | — |
 | Binance futures metrics (archivo diario) | OI, ratios long/short, ratio agresor | Fin de intervalo de 5 min + **48h** de demora simulada; antigüedad ≤ 10 min (E-06) o 12h (Fase 2) | 71 días con huecos; 1,913 de 2,221 archivos modificados después del plazo simulado |
 
+## Fuentes en vivo para el pronóstico de volatilidad (migración 007)
+
+A diferencia de los snapshots (inmutables, para investigación), el ML worker ingesta estas
+fuentes en vivo con `VOLATILITY_SOURCES_ENABLED=true` (ver el
+[runbook](../runbooks/full-stack-runbook.md)). Son inmutables por fila (`ON CONFLICT DO NOTHING`);
+`recorded_at` / `captured_at` indican cuándo se leyó, **no** cuándo estuvo disponible el dato.
+
+| Fuente | Tabla | Frescura en entrenamiento y producción | Si está vencida |
+|---|---|---|---|
+| Deribit DVOL (velas horarias **cerradas**) | `implied_volatility` | Disponible desde `open_time + 1h`; antigüedad máxima 6 h | Respaldo HAR |
+| VIX (yfinance) | `macro_daily` → `computed_features` | Cierre del día D disponible desde D + 1; máximo 5 días | Respaldo HAR |
+| Funding de Binance | `funding_rates` | Disponible desde `funding_time + 4h`; máximo 36 h | Respaldo HAR |
+| Calendario FOMC (Reserva Federal) | `event_calendar` | Reuniones programadas publicadas con antelación; refresco semanal | Respaldo HAR (sin reunión futura) |
+| Interés abierto de Binance (5 min, solo 30 días) | `open_interest` | **Se ingesta pero `har_x_live` no lo usa** (el histórico solo es utilizable con 48 h de demora simulada; en vivo sería instantáneo y sesgaría) | — |
+
+`openInterestHist` devuelve las **últimas** 500 filas del rango, no las primeras: el cliente
+pagina en ventanas de 500 pasos de 5 min. El OI se reevaluará con ≥ 1 año de datos en vivo.
+
 ## Snapshots auxiliares `aux-20190901-20261001-v1` (E-09) y `-v2` (E-10 a E-12)
 
 Ubicación: `ml/artifacts/aux-sources/<id>/`. La v2 recaptura todas las fuentes de la v1 y

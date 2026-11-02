@@ -5,7 +5,7 @@
 > de volatilidad validado**: volatilidad esperada, rango de precio probable, régimen de riesgo
 > y una calculadora de tamaño de posición. Todo con la misma API (FastAPI) y el mismo dashboard
 > (Next.js).
-> **Estado:** F0–F5 implementadas; F6 en curso (sombra iniciada el 2026-11-02; ventana del 2026-11-03 al 2027-01-26 UTC, commit `b3da2e1`); F7 pendiente.
+> **Estado:** F0–F5 implementadas; F6 en curso (sombra iniciada el 2026-11-02; ventana del 2026-11-03 al 2027-01-26 UTC, commit `b3da2e1`); F7 completada salvo las cifras de producción, que dependen de cerrar la sombra.
 
 ## 1. Punto de partida (evidencia)
 
@@ -244,7 +244,7 @@ resultados.
 | F4 ✅ | Backend: dominio, repositorio, servicios, endpoints, WS, pruebas | 2–3 d | Cobertura ≥ 80% (96%); contratos documentados en `/docs` |
 | F5 ✅ | Frontend: panel de riesgo, bandas, historial, calibración, calculadora | 3–4 d | tsc, lint y build en verde; verificación en el navegador (hecha con datos reales) |
 | F6 ⏳ | Sombra prospectiva (12 semanas de calendario) | Bajo | Criterio 4 de la sección 9 (stack `infra/docker-compose.shadow.yml`, `shadow.sh` y `src.volatility.shadow` listos y probados; en ejecución desde 2026-11-02: falta esperar 12 semanas y evaluar con `shadow.sh report`) |
-| F7 | Documentación: runbook, `docs/trading`, registro E-13 | 1 d | Documentos actualizados con cifras reales de producción |
+| F7 🟡 | Documentación: runbook, `docs/trading`, registro E-13 | 1 d | Documentos actualizados (hecho: runbooks, guía de trading con los multiplicadores y umbrales de E-12b, fuentes, metodología y **E-13 preregistrado**); pendiente: cifras reales de producción al cerrar la sombra |
 
 Total de esfuerzo: ≈ 14–18 días de desarrollo más 12 semanas de observación.
 
@@ -266,3 +266,16 @@ Total de esfuerzo: ≈ 14–18 días de desarrollo más 12 semanas de observaci�
 - Cambios al modelo direccional.
 - Estrategias combinadas (filtro de tendencia + tamaño por volatilidad + stops por rango): se
   evaluarán como E-13 antes de recomendarlas con cifras.
+
+## 13. Desviaciones y pendientes respecto al plan (2026-11-02)
+
+| Tema | Plan | Realidad |
+|---|---|---|
+| Reentrenamiento mensual (6.4) | Desde PostgreSQL, cada mes | Solo con el dataset congelado (`src.volatility.train`); reentrenar desde la base con `live_inputs` queda pendiente. Durante la sombra los modelos están congelados a propósito |
+| Modelo primario a 1 día | `har_x_live` | Registrado y servido, pero E-12b no demuestra ventaja sobre HAR a 1 día (IC [−0.013, 0.039]) |
+| Bandas a 1 día | Cobertura nominal | Algo conservadoras (91.1% y 96.0% para 90% y 95%); no se ajustaron |
+| Historial en el dashboard (8) | Últimas 26 semanas | Hasta 500 pronósticos por solicitud (≈ 12 semanas de velas de 4h) |
+| Banderas de activación | — | `VOLATILITY_SOURCES_ENABLED` (worker) y `VOLATILITY_ENABLED` (backend) apagadas por defecto para convivir con bases sin las migraciones 007–009 |
+| Estado del modelo direccional | Ya especificado | `DIRECTION_MODEL_STATUS` (experimental) y `baseline_overall` calculado como la regla «siempre la dirección más frecuente» sobre las predicciones resueltas |
+| E-13 | Evaluar combinaciones | Solo **preregistrado** en el registro de experimentos; no ejecutado |
+| Cifras de producción | En F7 | Dependen de la sombra (termina 2027-01-26) |

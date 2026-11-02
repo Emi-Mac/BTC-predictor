@@ -95,7 +95,10 @@ la banda del 68%, el movimiento aleatorio te sacará con frecuencia aunque tu id
 |---|---|---|
 | 1 día | 1.5 σ de 1 día ≈ 3.5% (fuera del 68% y cerca del 90%) | 74,877 |
 | 7 días, ajustado | 1 σ de 7 días = 6.15% (fuera del 68%) | 72,812 |
-| 7 días, holgado | 1.77 σ de 7 días = 10.88% (borde del 90%) | 69,139 |
+| 7 días, holgado | 1.87 σ de 7 días = 11.5% (borde del 90%) | 68,660 |
+
+> La calculadora del dashboard usa un stop log-simétrico, `P·exp(∓k·σ)` (5.97% para 1σ en lugar
+> de 6.15%); las cifras de esta tabla son aproximaciones lineales y difieren unos decimales.
 
 Más reglas:
 

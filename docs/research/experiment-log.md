@@ -382,12 +382,50 @@ viven en `ml/artifacts/` (no versionados); las cifras se copiaron de sus `report
 
 ---
 
+## E-13 Estrategias combinadas (tendencia + volatilidad + stops) — PREREGISTRADO, no ejecutado
+
+> **Estado:** protocolo fijado antes de mirar resultados. No se ejecuta ni se recomienda ninguna
+> combinación con cifras hasta que se corra con este protocolo (plan de integración, sección 12).
+
+- **Hipótesis:** combinar el filtro de tendencia de 180 días (E-11) con la exposición por
+  volatilidad objetivo (E-12) y stops a k·σ mejora el retorno ajustado por riesgo frente a
+  comprar y mantener **y** frente a cada componente por separado. Ninguno lo logró solo.
+- **Datos y corte:** los mismos del dataset congelado y snapshot auxiliar v2, desarrollo hasta
+  2026-10-01 con los 48 folds mensuales de E-12; no se usa la reserva de noviembre (E-06).
+- **Familia de estrategias (todas largas en spot, 7 pb por rotación, sin funding):**
+
+  | ID | Regla |
+  |---|---|
+  | S0 | Comprar y mantener |
+  | S1 | Filtro de tendencia de 180 días (E-11) |
+  | S2 | Volatilidad objetivo con `min(1, objetivo/σ̂₇d)`, objetivo ∈ {20%, 30%, 40%}, banda de rebalanceo 0.1 |
+  | S3 | S1 × S2 (dentro de tendencia, tamaño por volatilidad) |
+  | S4 | S3 + stop a 2σ̂ del horizonte de 7 días con reentrada al siguiente cierre de 00:00 UTC |
+
+  Cada variante con un objetivo distinto cuenta como un ensayo (3 × S2, 3 × S3, 3 × S4, S1; 10 en
+  total) y entra al contraste de White/Reality Check.
+- **Primario preespecificado:** S3 con objetivo 30% frente a S1 y frente a una exposición
+  constante igual a su media (para separar *timing* de «invertir menos»).
+- **Gate de aceptación (todas deben cumplirse):**
+  1. ΔSharpe de S3 frente a *buy & hold* y frente a S1: IC 95% por bloques de 180 velas > 0.
+  2. ΔSharpe frente a la exposición constante de igual media: IC > 0.
+  3. Reality Check sobre la familia completa: p < 0.05.
+  4. Caída máxima de S3 al menos 10 pp menor que la de S0.
+  5. Resultado consistente en al menos 3 de los 4 años completos del periodo.
+- **Si no se cumple:** se documenta como negativo; ninguna combinación se recomienda con cifras
+  en `docs/trading`. Todo análisis adicional se marca *post hoc*.
+- **Salvedades conocidas:** una sola muestra de 2022–2026 con pocos regímenes; el periodo fue
+  alcista con volatilidad alta, lo que ya hizo fallar el timing por volatilidad en E-12.
+
+---
+
 ## Direcciones abiertas
 
-1. **Producto de riesgo basado en E-12:** exponer el pronóstico HAR-X de volatilidad a 7 días
-   y el rango esperado de precio (±σ̂·√(7/365)). Antes de mostrarlo como "validado", evaluar
-   la cobertura de esos intervalos (p. ej. que el 68% de las semanas caiga dentro de ±1σ̂) y
-   recalibrar la pendiente de Mincer-Zarnowitz (0.76).
+1. **Producto de riesgo basado en E-12/E-12b:** *implementado* (backend, dashboard y calculadora;
+   ver el [plan de integración](../plans/volatility-integration-plan.md)). Falta la **sombra
+   prospectiva de 12 semanas** (2026-11-03 a 2027-01-26) antes de llamarlo «validado»; el
+   horizonte de 7 días sigue en validación hasta acumular 26 semanas. Las cifras de producción
+   se registrarán aquí al cerrarla. A 1 día no se demostró ventaja de HAR-X-live sobre HAR.
 2. **Holdout de noviembre (E-06):** evaluarlo a partir del 2026-12-02 tal como está congelado.
 3. **Datos de pago o de alta frecuencia** (skew histórico, libro de órdenes, liquidaciones):
    la única vía direccional que no se ha probado.

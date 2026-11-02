@@ -30,7 +30,7 @@ mientras la caída esté dentro de lo históricamente posible y tu horizonte sig
 ## 6.3 Riesgo de mercado específico de BTC
 
 - **Colas gruesas:** movimientos de 3σ ocurren mucho más que en una distribución normal. Por
-  eso la banda del 95% usa k = 2.52 y no 1.96.
+  eso la banda del 95% usa k ≈ 2.7 a 7 días (conforme) y no 1.96.
 - **Régimen de volatilidad:** la volatilidad se agrupa. Tras un día muy volátil, espera más
   días volátiles; reduce el tamaño en régimen alto o extremo.
 - **Eventos macro:** decisiones del FOMC y datos de inflación de EE. UU. mueven el mercado.

@@ -28,16 +28,19 @@ poner tus límites**, no para adivinar si BTC sube o baja.
 | 8 | [Automatización segura](./08-automatizacion-segura.md) | Si algún día conectas un bot: requisitos mínimos |
 | — | [Glosario](./glosario.md) | Términos usados |
 
-## Estado de cada señal (actualizado 2026-10-31)
+## Estado de cada señal (actualizado 2026-11-02)
 
 | Señal | Evidencia | Uso recomendado |
 |---|---|---|
-| Volatilidad pronosticada (HAR-X) | ✅ Validada fuera de muestra (E-12) | Tamaño de posición, distancia de stops, alertas de régimen |
-| Rango probable de precio | 🟡 Multiplicadores empíricos medidos en 2022–2026; calibración prospectiva pendiente (plan de integración, F6) | Colocar stops y objetivos fuera del ruido normal |
+| Volatilidad pronosticada (HAR-X-live, sin interés abierto) | ✅ Validada fuera de muestra a 7 días (E-12, E-12b); a 1 día no se demuestra ventaja sobre HAR | Tamaño de posición, distancia de stops, alertas de régimen |
+| Rango probable de precio | 🟡 Multiplicadores conformes con cobertura nominal fuera de muestra a 7 días (E-12b); **sombra prospectiva de 12 semanas en curso** (2026-11-03 a 2027-01-26) | Colocar stops y objetivos fuera del ruido normal |
 | Filtro de tendencia de 180 días (regla, sin ML) | 🟡 Reduce caídas (−33% vs −53%) sin mejorar el retorno ajustado (E-11) | Estar o no estar en el mercado, si priorizas evitar caídas grandes |
 | Predicción direccional a 4h (modelo v2) | 🔴 No supera a la regla simple; por debajo del acierto mínimo con comisiones | Solo observación; nunca como única razón para operar |
 
-La evidencia completa está en [docs/research](../research/README.md). La integración de la
-volatilidad en el dashboard está planificada en
-[volatility-integration-plan.md](../plans/volatility-integration-plan.md); hasta que se
-complete, los valores de volatilidad se obtienen de los estudios o del ML worker.
+La evidencia completa está en [docs/research](../research/README.md). La volatilidad ya está
+integrada en el backend y el dashboard (ver
+[volatility-integration-plan.md](../plans/volatility-integration-plan.md) y el
+[runbook](../runbooks/full-stack-runbook.md)). Hasta que la sombra prospectiva termine, el panel
+se muestra como **«en validación»**: las bandas y la volatilidad son útiles para dimensionar
+riesgo, pero su cobertura real en vivo aún no está confirmada. No hay todavía cifras de
+producción; se publicarán en el registro de experimentos al cerrar la sombra.
